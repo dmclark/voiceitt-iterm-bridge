@@ -124,3 +124,9 @@ install.sh                 # Symlinks scripts and html to their runtime location
   session of the *current* iTerm window. Click the iTerm tab you want to
   receive text into before triggering, or just leave that tab focused while
   you dictate.
+
+## Roadmap
+
+Two larger pieces of follow-up work — pluggable paste target (any app, not
+just iTerm) and a possible Raycast store extension — are planned in
+[ROADMAP.md](./ROADMAP.md).
