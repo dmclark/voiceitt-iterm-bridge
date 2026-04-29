@@ -1,0 +1,5 @@
+# Server log written by open-voiceitt.sh into the runtime bridge dir; never lands here, but ignore just in case.
+server.log
+
+# macOS noise
+.DS_Store

@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Voiceitt Scratchpad</title>
+  <style>
+    html, body { margin: 0; padding: 0; height: 100%; background: #ffffff; color: #1a1a1a; font-family: -apple-system, BlinkMacSystemFont, "SF Pro", system-ui, sans-serif; }
+    body { display: flex; flex-direction: column; }
+    header { padding: 8px 14px; font-size: 12px; color: #666; border-bottom: 1px solid #e0e0e0; display: flex; justify-content: space-between; align-items: center; background: #f7f7f7; }
+    textarea {
+      flex: 1; width: 100%; box-sizing: border-box;
+      padding: 18px; border: 0; outline: none; resize: none;
+      background: #ffffff; color: #1a1a1a;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+      font-size: 20px; line-height: 1.5;
+    }
+    button { background: #e0e0e0; color: #1a1a1a; border: 1px solid #c8c8c8; padding: 4px 10px; border-radius: 4px; font-size: 12px; cursor: pointer; }
+    button:hover { background: #d0d0d0; }
+  </style>
+</head>
+<body>
+  <header>
+    <span>Voiceitt Scratchpad — dictate here, then trigger your Raycast hotkey.</span>
+    <button id="clear" title="Clear (⌘K)">Clear</button>
+  </header>
+  <textarea id="pad" autofocus placeholder="Start dictating with Voiceitt…"></textarea>
+
+  <script>
+    const pad = document.getElementById('pad');
+    const clearBtn = document.getElementById('clear');
+
+    // Always keep focus in the textarea so Cmd+A / Cmd+C target it.
+    function refocus() { pad.focus(); }
+    window.addEventListener('focus', refocus);
+    document.addEventListener('click', (e) => { if (e.target !== clearBtn) refocus(); });
+    setTimeout(refocus, 0);
+
+    clearBtn.addEventListener('click', () => { pad.value = ''; refocus(); });
+
+    // Cmd+K to clear
+    window.addEventListener('keydown', (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        pad.value = '';
+      }
+    });
+  </script>
+</body>
+</html>
