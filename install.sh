@@ -10,6 +10,14 @@ BRIDGE_DIR="$HOME/.config/voiceitt-bridge"
 
 mkdir -p "$RAYCAST_DIR" "$BRIDGE_DIR"
 
+# Remove stale symlinks from the previous "amp" naming, if present.
+for stale in send-to-amp.sh send-to-amp-and-run.sh; do
+  if [ -L "$RAYCAST_DIR/$stale" ]; then
+    rm -f "$RAYCAST_DIR/$stale"
+    echo "removed stale  $RAYCAST_DIR/$stale"
+  fi
+done
+
 for f in "$REPO_DIR"/scripts/*.sh; do
   name="$(basename "$f")"
   target="$RAYCAST_DIR/$name"

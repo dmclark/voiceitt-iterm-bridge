@@ -1,14 +1,17 @@
-# voiceitt-amp-bridge
+# voiceitt-iterm-bridge
 
 A small toolkit that lets you dictate prompts with [Voiceitt](https://www.voiceitt.com/)
-(a Chrome-only voice dictation extension) and send them straight to the
-[Amp CLI](https://ampcode.com/) running in iTerm, then jump back to dictate the next prompt.
+(a Chrome-only voice dictation extension) and send them straight into the
+**current iTerm tab** — whatever shell, REPL, or CLI tool (Amp, Claude Code,
+`bash`, `python`, `ssh`, …) is running there — then jump back to dictate the
+next prompt.
 
 ## Why
 
-Voiceitt only works in Chrome. The Amp CLI runs in a terminal. This bridges the gap
-without any custom server, web UI, or API integration — just a tiny local HTML
-scratchpad served over `http://localhost`, plus a few Raycast Script Commands.
+Voiceitt only works in Chrome. Most CLI work happens in a terminal. This
+bridges the gap without any custom server, web UI, or API integration — just a
+tiny local HTML scratchpad served over `http://localhost`, plus a few Raycast
+Script Commands.
 
 ## Architecture
 
@@ -25,7 +28,7 @@ scratchpad served over `http://localhost`, plus a few Raycast Script Commands.
                                               │ iTerm AppleScript
                                               ▼
                                    ╭────────────────────╮
-                                   │  Amp CLI in iTerm   │
+                                   │  Current iTerm tab  │
                                    ╰────────────────────╯
 ```
 
@@ -33,7 +36,7 @@ scratchpad served over `http://localhost`, plus a few Raycast Script Commands.
 
 - macOS (tested on macOS Tahoe)
 - [Raycast](https://www.raycast.com/) — for global hotkeys + script commands
-- [iTerm2](https://iterm2.com/) — your Amp CLI terminal
+- [iTerm2](https://iterm2.com/) — your terminal of choice
 - Google Chrome with the Voiceitt extension installed
 - `python3` (ships with macOS / Xcode CLT) — runs the local web server
 - `cliclick` (`brew install cliclick`) — sends Cmd+A/Cmd+C reliably under Sticky Keys
@@ -42,8 +45,8 @@ scratchpad served over `http://localhost`, plus a few Raycast Script Commands.
 ## Install
 
 ```bash
-git clone <this-repo> ~/voiceitt-amp-bridge
-cd ~/voiceitt-amp-bridge
+git clone <this-repo> ~/voiceitt-iterm-bridge
+cd ~/voiceitt-iterm-bridge
 ./install.sh
 ```
 
@@ -56,31 +59,31 @@ HTML scratchpad into `~/.config/voiceitt-bridge/`. Then in Raycast:
 
 ## Hotkey suggestions
 
-| Command                    | Suggested hotkey | What it does                                                      |
-| -------------------------- | ---------------- | ----------------------------------------------------------------- |
-| Open Voiceitt Scratchpad   | `⌥⇧O`            | Starts the local server (if needed) and opens the page in Chrome. |
-| Send to Amp                | `⌥⇧V`            | Cmd+A/Cmd+C in Chrome, paste into iTerm. Doesn't press Return.    |
-| Send to Amp & Run          | `⌥⇧↩`            | Same as above plus Return — submits to Amp.                       |
-| Back to Voiceitt           | `⌥⇧B`            | Brings the Scratchpad Chrome window forward by title.             |
+| Command                    | Suggested hotkey | What it does                                                          |
+| -------------------------- | ---------------- | --------------------------------------------------------------------- |
+| Open Voiceitt Scratchpad   | `⌥⇧O`            | Starts the local server (if needed) and opens the page in Chrome.     |
+| Send to iTerm              | `⌥⇧V`            | Cmd+A/Cmd+C in Chrome, paste into the current iTerm tab. No Return.   |
+| Send to iTerm & Run        | `⌥⇧↩`            | Same as above plus Return — submits the line to whatever's running.   |
+| Back to Voiceitt           | `⌥⇧B`            | Brings the Scratchpad Chrome window forward by title.                 |
 
 ## Daily use
 
 1. `⌥⇧O` — Scratchpad opens in Chrome (light theme, big textarea).
 2. Activate Voiceitt and dictate. Text appears in the textarea.
-3. `⌥⇧V` (or `⌥⇧↩`) — text lands in iTerm's Amp prompt.
+3. `⌥⇧V` (or `⌥⇧↩`) — text lands in the current iTerm tab.
 4. `⌥⇧B` — returns to the Scratchpad. `⌘K` clears the textarea for the next prompt.
 
 ## Files
 
 ```
 scripts/
-  open-voiceitt.sh       # Starts python3 http.server on :7531, opens Chrome window
-  send-to-amp.sh         # Cmd+A/Cmd+C → inject clipboard into iTerm (no Return)
-  send-to-amp-and-run.sh # Same, plus Return (submits to Amp)
-  back-to-voiceitt.sh    # Find Chrome window titled "Voiceitt Scratchpad", raise it
+  open-voiceitt.sh         # Starts python3 http.server on :7531, opens Chrome window
+  send-to-iterm.sh         # Cmd+A/Cmd+C → inject clipboard into current iTerm tab (no Return)
+  send-to-iterm-and-run.sh # Same, plus Return (submits the line)
+  back-to-voiceitt.sh      # Find Chrome window titled "Voiceitt Scratchpad", raise it
 bridge/
-  dictate.html           # The Scratchpad page (light theme, autofocus, ⌘K to clear)
-install.sh               # Symlinks scripts and html to their runtime locations
+  dictate.html             # The Scratchpad page (light theme, autofocus, ⌘K to clear)
+install.sh                 # Symlinks scripts and html to their runtime locations
 ```
 
 ## Why each piece exists
@@ -97,7 +100,8 @@ install.sh               # Symlinks scripts and html to their runtime locations
   continues to work normally for the user's physical typing.
 - **iTerm's `write text ... newline yes/no`** — pastes directly into the
   current session via AppleScript, avoiding a synthetic Cmd+V (which Sticky
-  Keys can also block).
+  Keys can also block). Because it targets the *current* iTerm session, it
+  works with whatever you're running there — Amp, a shell, Python, SSH, etc.
 - **Sentinel + clipboard polling** — the script stamps the clipboard with
   a known marker before copying, then waits to confirm the clipboard
   actually changed. If the copy silently fails (e.g. wrong app focused),
@@ -116,3 +120,7 @@ install.sh               # Symlinks scripts and html to their runtime locations
 - **Wrong Chrome window comes forward on "Back to Voiceitt"** — keep the
   Scratchpad as the active tab in its window. The script matches by
   window title, which reflects the active tab's `<title>`.
+- **Text landed in the wrong iTerm tab** — the scripts target the *current*
+  session of the *current* iTerm window. Click the iTerm tab you want to
+  receive text into before triggering, or just leave that tab focused while
+  you dictate.

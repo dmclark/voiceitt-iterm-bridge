@@ -1,11 +1,11 @@
 #!/bin/bash
 
 # @raycast.schemaVersion 1
-# @raycast.title Send to Amp & Run
+# @raycast.title Send to iTerm & Run
 # @raycast.mode silent
 # @raycast.packageName Voiceitt
 # @raycast.icon 🚀
-# @raycast.description Copy from focused app (Voiceitt textarea), inject into iTerm, then submit. Sticky-Keys safe via cliclick.
+# @raycast.description Copy from focused app (Voiceitt textarea), inject into the current iTerm tab, then submit. Sticky-Keys safe via cliclick.
 
 set -e
 CLICLICK="/opt/homebrew/bin/cliclick"
@@ -28,7 +28,7 @@ for i in 1 2 3 4 5 6 7 8 9 10; do
 done
 
 if [ "$CURRENT" = "$SENTINEL" ] || [ -z "$CURRENT" ]; then
-  osascript -e 'display notification "Cmd+A/Cmd+C did not capture text. Make sure the Voiceitt textarea is focused." with title "Send to Amp & Run"'
+  osascript -e 'display notification "Cmd+A/Cmd+C did not capture text. Make sure the Voiceitt textarea is focused." with title "Send to iTerm & Run"'
   exit 1
 fi
 
