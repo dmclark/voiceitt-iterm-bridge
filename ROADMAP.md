@@ -28,115 +28,173 @@ That's reliable and bypasses Sticky Keys entirely (no synthetic Cmd+V), but it
 is iTerm-specific. We want to be able to dictate into Slack, a Chrome textarea
 on a different tab, VS Code, Notes, a different terminal emulator, etc.
 
-### The core problem
+### Why this isn't just "read frontmost app at send time"
 
 Triggering the Raycast hotkey itself changes focus. By the time our script
 runs, "the app the user wanted to paste into" is no longer frontmost — Raycast
 or the scratchpad is. So we cannot simply read `frontmost` at send time. The
-target has to be **remembered out-of-band** before the user dictates.
+target has to be **fixed ahead of time**.
 
-### Proposed design — explicit "target" with a sensible default
+There's a second, OS-level reason this matters: macOS gates cross-app
+automation per (controlling app, controlled app) pair. The first time Raycast
+(or `osascript` invoked from Raycast) tries to script Slack, the user gets a
+"Allow Raycast to control Slack?" prompt. `cliclick` similarly requires
+Accessibility permission for whichever process is invoking it. **Each new
+target app implies at least one fresh permission prompt that the user has to
+answer.** Any design has to make that moment obvious instead of mysterious.
 
-Add a small piece of persistent state at `~/.config/voiceitt-bridge/target.json`:
+### Approach A — Per-target scripts via a generator (recommended)
 
-```json
-{
-  "kind": "iterm" | "app" | "window",
-  "appName": "iTerm",
-  "bundleId": "com.googlecode.iterm2",
-  "windowId": 12345,
-  "label": "iTerm — main session"
-}
+Instead of one dynamic dispatcher that figures out the right strategy at
+runtime, ship a small **generator** that stamps out a new dedicated
+`send-to-<app>.sh` Raycast command for each app the user wants to target. The
+user then enables the new command in Raycast and assigns it a hotkey, exactly
+like the existing iTerm scripts.
+
+Why this fits the problem well:
+
+- **One hotkey per target** is actually the natural mental model — the user
+  knows whether they're dictating to iTerm vs. Slack vs. VS Code; a dedicated
+  hotkey per target avoids needing a "set target" step before every send.
+- **Permissions surface naturally and exactly once.** The first time the user
+  triggers `Send to Slack`, macOS prompts to allow Raycast to control Slack
+  (or to allow Accessibility for `cliclick`). That mapping — one prompt per
+  generated command — is much easier to reason about than a single dispatcher
+  that occasionally trips a new prompt depending on internal state.
+- **No persistent state file, no focus-loss bug, no picker UI** to design.
+- **Generated scripts are inspectable bash.** The user can hand-tweak any of
+  them (different paste strategy, different submit key, different icon) without
+  understanding a runtime config schema.
+- **Removing a target = deleting the script.** No orphaned state.
+
+Sketch:
+
+```
+scripts/
+  new-target.sh                 # The generator. Prompted once per new app.
+  send-to-iterm.sh              # Existing.
+  send-to-iterm-and-run.sh      # Existing.
+  send-to-slack.sh              # Generated.
+  send-to-vscode.sh             # Generated.
+  send-to-chrome-textarea.sh    # Generated.
+  ...
+templates/
+  send-applescript.sh.tmpl      # AppleScript-driven (iTerm-style) targets.
+  send-cliclick-paste.sh.tmpl   # Generic activate-and-Cmd+V targets.
+  send-cliclick-paste-run.sh.tmpl
 ```
 
-Three new / modified Raycast commands:
+`new-target.sh` is a Raycast Script Command with arguments
+(`# @raycast.argument1 …`) that asks for:
 
-| Command                       | Behavior                                                                                  |
-| ----------------------------- | ----------------------------------------------------------------------------------------- |
-| `Set Voiceitt Target`         | Captures the currently frontmost app + window and writes it to `target.json`.             |
-| `Send to Target`              | Replaces `send-to-iterm.sh`. Reads `target.json` and dispatches to the right strategy.    |
-| `Send to Target & Run`        | Same, but submits Return at the end (only meaningful for terminal-like targets).          |
+| Argument          | Example         | Purpose                                                          |
+| ----------------- | --------------- | ---------------------------------------------------------------- |
+| Target name       | `Slack`         | Used for the Raycast title (`Send to Slack`) and the file name.  |
+| Bundle id         | `com.tinyspeck.slackmacgap` | Used in `osascript -e 'tell application id "…" to activate'`. Pre-filled by detecting the most-recently-frontmost non-Raycast app, so usually the user just presses Enter. |
+| Strategy          | `applescript` \| `cliclick-paste` | Which template to instantiate. Default: `cliclick-paste` for unknown apps; `applescript` is offered for iTerm, Terminal, Chrome, Safari. |
+| Submit on send    | `none` \| `return` \| `cmd+return` | Whether the `& Run` variant should also press a key after pasting. Defaults sensibly per known app (chat apps → `return`, terminals → `return`, editors → `none`). |
+| Icon              | `💬`           | Optional emoji for the Raycast row.                               |
 
-`Set Voiceitt Target` is what closes the focus-loss problem: the user clicks
-into the destination they want, then triggers the hotkey, which records the
-target *before* opening the scratchpad. `Open Voiceitt Scratchpad` can be
-extended to call `Set Voiceitt Target` first, so the common flow ("focus the
-app I want to dictate into, then press my hotkey") just works.
+The generator does:
 
-### Dispatch strategies inside `Send to Target`
+1. Slugify the target name → `slack`.
+2. Read the right template, substitute `{{TARGET_NAME}}`, `{{BUNDLE_ID}}`,
+   `{{ICON}}`, `{{SUBMIT_KEY}}`.
+3. Write `scripts/send-to-<slug>.sh` (and, if "& Run" is requested, a
+   `send-to-<slug>-and-run.sh` companion).
+4. `chmod +x` and `ln -sfn` into `~/.config/raycast/scripts/` — same
+   convention `install.sh` already uses.
+5. Show a notification: *"Created Send to Slack. Open Raycast and assign a
+   hotkey. The first trigger will prompt for permission to control Slack."*
 
-The script picks one of these based on `target.json`:
+#### Strategy templates
 
-1. **Native AppleScript path** — for apps with a real scripting dictionary:
-   - `iTerm` (current implementation)
-   - `Terminal.app` (`do script` / `tell window N to do script`)
-   - `Google Chrome` / `Safari` (`execute javascript` to set a textarea value)
-   - `Notes`, `Messages`, etc. where applicable
-   - Highest fidelity, no key synthesis, Sticky-Keys-proof.
+`send-applescript.sh.tmpl` — for apps with a real scripting dictionary:
 
-2. **Generic "activate + cliclick paste" path** — for everything else:
-   ```bash
-   osascript -e "tell application id \"$BUNDLE_ID\" to activate"
-   sleep 0.05
-   "$CLICLICK" ku:cmd,alt,ctrl,shift,fn
-   "$CLICLICK" kd:cmd t:v ku:cmd
-   ```
-   `cliclick` posts CGEvents below the Sticky Keys layer, so Cmd+V works even
-   with Sticky Keys on. Caveats: relies on whatever control had focus inside
-   that app being a paste target; some apps (e.g. 1Password, secure fields)
-   refuse synthetic paste.
+```bash
+osascript <<EOF
+set clipText to (the clipboard as text)
+tell application id "{{BUNDLE_ID}}"
+  activate
+  -- per-app body, hand-curated for iTerm/Terminal/Chrome/Safari
+end tell
+EOF
+```
 
-3. **Window-targeted path** (optional, harder) — if `target.json` records a
-   specific `windowId`, raise that window first via Accessibility (AX) APIs
-   before pasting. AppleScript can't cleanly target an arbitrary window by
-   ID across all apps; this would either need a small Swift helper using
-   `AXUIElement` or a third-party tool like `yabai`. Recommend deferring
-   this until a real user need surfaces.
+`send-cliclick-paste.sh.tmpl` — for everything else:
 
-### `Run` semantics on non-terminals
+```bash
+osascript -e 'tell application id "{{BUNDLE_ID}}" to activate'
+sleep 0.05
+"$CLICLICK" ku:cmd,alt,ctrl,shift,fn >/dev/null 2>&1 || true
+"$CLICLICK" kd:cmd w:60 t:v w:60 ku:cmd
+{{#SUBMIT_KEY_RETURN}}sleep 0.05
+"$CLICLICK" kp:return{{/SUBMIT_KEY_RETURN}}
+```
 
-`Send to Target & Run` only makes sense for terminal-shaped targets. For other
-apps the `Run` variant should either:
+Both templates reuse the existing sentinel-on-clipboard / Sticky-Keys-safe
+copy preamble verbatim — that part isn't target-specific.
 
-- fall back to plain paste (no Return), or
-- press Return via cliclick (`"$CLICLICK" kp:return`) for chat apps where
-  Enter sends the message.
+#### Work breakdown
 
-Decide per-target by adding an optional `submitKey` field to `target.json`
-(`"return"`, `"cmd+return"`, `null`).
+| Step | Description                                                                       | Est. effort |
+| ---- | --------------------------------------------------------------------------------- | ----------- |
+| 1    | Extract the shared "copy from focused app via cliclick + sentinel" preamble into a sourced `lib/copy-focused.sh`. | 0.25 day |
+| 2    | Build the two strategy templates and small substitution logic in `new-target.sh`. | 0.5 day     |
+| 3    | Pre-fill bundle id by inspecting `lsappinfo list` for the most-recent frontmost non-Raycast app. | 0.25 day |
+| 4    | Curate AppleScript bodies for the four "first-class" apps (iTerm, Terminal, Chrome, Safari). | 0.5 day |
+| 5    | README section: "Adding a new target", with the permission-prompt walkthrough.    | 0.25 day    |
 
-### Work breakdown
+Total: **~2 days**, same ballpark as the dispatcher approach but with a
+materially simpler runtime.
 
-| Step | Description                                                                  | Est. effort |
-| ---- | ---------------------------------------------------------------------------- | ----------- |
-| 1    | Add `set-target.sh` Raycast command that records frontmost app + window.    | 0.5 day     |
-| 2    | Refactor `send-to-iterm*.sh` into a single dispatcher reading `target.json`. | 0.5 day     |
-| 3    | Implement AppleScript paths for iTerm, Terminal, Chrome, Safari.             | 0.5 day     |
-| 4    | Implement generic cliclick-paste fallback.                                   | 0.25 day    |
-| 5    | Update README + add notification feedback ("Target set: iTerm — window 1").  | 0.25 day    |
-| 6    | (Optional) AX-based window raising via small Swift helper.                   | 1–2 days    |
+#### Risks and open questions
 
-Total: **~2 days** for the practical version, plus an optional 1–2 days for
-window-precise targeting.
+- **Bundle id discovery** — for very new or weirdly-named apps,
+  `lsappinfo info -only bundleid <pid>` is reliable; a fallback to "the user
+  types the bundle id" is fine.
+- **Wrong control focused inside the target app** — `cliclick-paste` only
+  works when the destination app's focused control accepts paste. The
+  generated script can't know that; document it, and let users hand-edit the
+  generated script if they need an app-specific click-into-the-text-field
+  step before pasting.
+- **Sticky Keys + Cmd+V** — believed to be safe because `cliclick` posts
+  CGEvents below the Sticky Keys layer. Verify on the user's machine before
+  promising support for non-terminal apps.
+- **Secure Input mode** — when macOS is in Secure Input (a password field is
+  focused anywhere on the system), no synthetic input works. The shared
+  preamble should detect this and bail with a clear notification.
+- **Discoverability** — users can end up with a long list of `send-to-*`
+  Raycast commands. That's actually fine; Raycast is built for it. If it ever
+  gets unwieldy we can group them under a Raycast extension (see section 2).
 
-### Risks and open questions
+### Approach B — Single dynamic dispatcher (alternative considered)
 
-- **Stale targets** — if the user closes the recorded window, the dispatcher
-  should detect that (AppleScript `exists window id …`) and fall back to
-  "any window of `appName`", with a notification.
-- **Secure input mode** — when macOS is in Secure Input (e.g. password
-  prompt focused), no synthetic input works. Detect via
-  `IsSecureEventInputEnabled` and bail out with a clear notification.
-- **Sticky Keys + Cmd+V** — `cliclick` is believed to bypass it, but worth
-  retesting on the user's actual config before promising support for arbitrary
-  apps.
-- **Multi-display / Spaces** — activating an app in another Space causes a
-  Space switch. May want a "don't switch Space" mode that uses AX to send
-  text without raising the window. Defer.
+For completeness, the originally-considered design: store the chosen target
+in `~/.config/voiceitt-bridge/target.json`, add a `Set Voiceitt Target`
+command that captures the current frontmost app and writes that file, and
+have a single `Send to Target` command that reads it and dispatches.
+
+Why we're not going with this as the primary plan:
+
+- Adds a mandatory "set target" step before every new dictation context.
+- Permission prompts pop up at unpredictable moments (whenever the dispatcher
+  first encounters a new target app), which is confusing.
+- The `Set Target` command itself has the focus-loss problem unless we're
+  clever about timing — it has to read `frontmost` *before* the user invokes
+  it, which is awkward.
+- Less flexible: per-target tweaks (a custom AppleScript body, a different
+  submit key) require editing a config file rather than just editing a small
+  bash script.
+
+It's still a valid fallback if the per-script approach produces too many
+commands for someone's taste, and the underlying paste strategies are the
+same — so switching to a dispatcher later would mostly be a UI change.
 
 ---
+Previous ideas were discarded, but the above is the current plan.
 
-## 2. Turning this into a Raycast extension on the Raycast store
+## Turning this into a Raycast extension on the Raycast store
 
 ### Today vs. extension
 
