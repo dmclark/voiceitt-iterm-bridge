@@ -2,7 +2,7 @@
 
 ## History
 
-The idea of a "bridge" originally came out of my work trying to make Voiceitt just another LLM [VoiceInk](https://github.com/Beingpax/VoiceInk) could use as a transcription backend. I've successfully built a [working prototype](https://github.com/dmclark/VoiceInk). The issue is that API consumption to be fiscally viable.
+The idea of a "bridge" originally came out of my work trying to make Voiceitt just another LLM [VoiceInk](https://github.com/Beingpax/VoiceInk) could use as a transcription backend. I've successfully built a [working prototype](https://github.com/dmclark/VoiceInk). The issue is that API consumption is too high to be fiscally viable.
 
 This approach is to provide the same functionality without the API. We are serving a page locally (the extension does not work on local files), essentially replacing [https://web.voiceitt.com/dictate] with a local page so that we can add keyboard shortcuts to send the text to local apps..`
 
