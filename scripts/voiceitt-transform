@@ -1,0 +1,70 @@
+#!/bin/bash
+# voiceitt-transform — read dictated text on stdin, write LLM-cleaned text on stdout.
+#
+# v0: hardcoded provider (Google AI Studio / Gemini 2.5 Flash) and hardcoded
+# "fix dictation noise" prompt. No config file, no picker. This is a vertical
+# slice to validate that the cleaned output is good enough to be worth wiring
+# into the send-to-* scripts.
+#
+# Usage:
+#   echo "um so like make a directory called source" | scripts/voiceitt-transform
+#
+# Requires:
+#   - GOOGLE_API_KEY in env (get one at https://aistudio.google.com/apikey)
+#   - curl, jq
+
+set -e
+
+if [ -z "$GOOGLE_API_KEY" ]; then
+  echo "voiceitt-transform: GOOGLE_API_KEY is not set" >&2
+  exit 2
+fi
+
+for cmd in curl jq; do
+  if ! command -v "$cmd" >/dev/null 2>&1; then
+    echo "voiceitt-transform: required command '$cmd' not found on PATH" >&2
+    exit 2
+  fi
+done
+
+MODEL="${VOICEITT_TRANSFORM_MODEL:-gemini-2.5-flash}"
+# REVISIT: default timeout. 6s chosen for v0 standalone testing because
+# observed gemini-2.5-flash latency is ~1–5s with occasional outliers above
+# 2.5s. When the send-to-* wrappers gain a fail-open-to-raw-clipboard path,
+# this should drop back to ~2.5s so a slow API call doesn't visibly hang
+# the paste hotkey. Or switch the default model to gemini-2.5-flash-lite,
+# which is typically sub-second.
+TIMEOUT="${VOICEITT_TRANSFORM_TIMEOUT:-6}"
+
+SYSTEM='Lightly clean dictated text. Remove disfluencies (um, uh, false starts, restarts). Fix obvious capitalisation and punctuation. Do not change wording, do not add information, do not summarise. Output only the cleaned text, with no surrounding quotes, no markdown fences, and no trailing newline.'
+
+INPUT="$(cat)"
+
+# If stdin is empty, pass through unchanged.
+if [ -z "$INPUT" ]; then
+  exit 0
+fi
+
+REQUEST="$(jq -n --arg s "$SYSTEM" --arg u "$INPUT" '{
+  system_instruction: { parts: [{ text: $s }] },
+  contents:           [{ role: "user", parts: [{ text: $u }] }],
+  generationConfig:   { temperature: 0.2 }
+}')"
+
+RESPONSE="$(curl -sS --max-time "$TIMEOUT" \
+  "https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${GOOGLE_API_KEY}" \
+  -H "content-type: application/json" \
+  -d "$REQUEST")" || {
+    echo "voiceitt-transform: API call failed or timed out after ${TIMEOUT}s" >&2
+    exit 1
+  }
+
+CLEANED="$(jq -r '.candidates[0].content.parts[0].text // empty' <<<"$RESPONSE")"
+
+if [ -z "$CLEANED" ]; then
+  echo "voiceitt-transform: empty response from Gemini. Raw response:" >&2
+  echo "$RESPONSE" >&2
+  exit 1
+fi
+
+printf '%s' "$CLEANED"
