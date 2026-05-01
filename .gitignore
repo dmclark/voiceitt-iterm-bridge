@@ -3,3 +3,4 @@ server.log
 amp-cost-analysis.md
 # macOS noise
 .DS_Store
+.env
