@@ -1,5 +1,8 @@
 # Server log written by open-voiceitt.sh into the runtime bridge dir; never lands here, but ignore just in case.
 server.log
 amp-cost-analysis.md
+# Private notes about the (not-yet-public) Chrome extension fork.
+notes-chrome-extension.md
 # macOS noise
 .DS_Store
+.env
