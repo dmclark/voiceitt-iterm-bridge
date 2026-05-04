@@ -73,6 +73,82 @@ HTML scratchpad into `~/.config/voiceitt-bridge/`. Then in Raycast:
 3. `⌥⇧V` (or `⌥⇧↩`) — text lands in the current iTerm tab.
 4. `⌥⇧B` — returns to the Scratchpad. `⌘K` clears the textarea for the next prompt.
 
+## Adding a new shortcut (e.g. VS Code, Slack, Notes)
+
+Every `send-to-*.sh` is a small bash script with a Raycast header. Adding a
+new target is a copy-paste-edit job — roughly five minutes once you know the
+target app's bundle id.
+
+### Pick the right base script
+
+Two strategies, two starting points:
+
+| Strategy           | When to use                                            | Start from                  |
+| ------------------ | ------------------------------------------------------ | --------------------------- |
+| **AppleScript**    | App has a useful scripting dictionary for "insert text into the active session" (iTerm, Terminal). | `scripts/send-to-iterm.sh`  |
+| **cliclick paste** | Everything else (VS Code, Slack, Notes, browsers, most editors). | `scripts/send-to-vscode.sh` |
+
+When in doubt, copy `send-to-vscode.sh` — the cliclick-paste strategy works
+in any app that accepts a normal Cmd+V into its focused control.
+
+### Find the target app's bundle id
+
+```bash
+osascript -e 'id of app "Visual Studio Code"'   # com.microsoft.VSCode
+osascript -e 'id of app "Slack"'                # com.tinyspeck.slackmacgap
+osascript -e 'id of app "Notes"'                # com.apple.Notes
+```
+
+### Edit four things
+
+1. **Raycast header** — `@raycast.title`, `@raycast.description`, `@raycast.icon`.
+2. **`TARGET_BUNDLE_ID`** — the value from the previous step.
+3. **The notification title** in the "did not capture text" `osascript`
+   line, so the failure toast says the right app name.
+4. **Filename** — `scripts/send-to-<slug>.sh`.
+
+The Cmd+A/Cmd+C copy preamble (steps 1–5 in every script) is destination-agnostic
+and shouldn't change.
+
+### Wire it up
+
+```bash
+chmod +x scripts/send-to-<slug>.sh
+./install.sh           # idempotent — picks up the new script automatically
+```
+
+### First-trigger permission prompts
+
+Open Raycast → Settings → Extensions → Script Commands → find your new
+**Send to <App>** → assign a hotkey. The first time you trigger it, macOS
+will pop **one or two** prompts:
+
+- *"Raycast wants to control \<App\>"* — click **Allow**. (Both strategies
+  trigger this because `osascript ... activate` counts as control.)
+- If you've never granted Accessibility to Raycast or to `cliclick`'s host
+  process, you may also see an Accessibility prompt → **System Settings →
+  Privacy & Security → Accessibility** → enable Raycast.
+
+If you accidentally dismissed either, find them under **System Settings →
+Privacy & Security → Automation** (per-app toggles) and **→ Accessibility**.
+
+### Verify with Sticky Keys ON
+
+The whole point of this toolkit is Sticky-Keys-safe dictation. Always test
+your new shortcut with **Sticky Keys ON** before declaring victory:
+
+1. System Settings → Accessibility → Keyboard → Sticky Keys → ON.
+2. Open the destination app, focus the field/editor that should receive text.
+3. `⌥⇧O` (or however you open the Scratchpad) → dictate a sentence.
+4. Trigger the new hotkey.
+5. Text should land in the destination intact, with no stuck modifiers
+   afterwards.
+
+If the paste arrives but with a stuck Cmd (e.g. the next keypress triggers
+a menu shortcut), the modifier-release line in the script
+(`"$CLICLICK" ku:cmd,alt,ctrl,shift,fn ...`) didn't fire — re-check that
+your edited script still has it before step 6.
+
 ## Files
 
 ```
@@ -80,6 +156,7 @@ scripts/
   open-voiceitt.sh         # Starts python3 http.server on :7531, opens Chrome window
   send-to-iterm.sh         # Cmd+A/Cmd+C → inject clipboard into current iTerm tab (no Return)
   send-to-iterm-and-run.sh # Same, plus Return (submits the line)
+  send-to-vscode.sh        # Cmd+A/Cmd+C → activate VS Code → cliclick Cmd+V into active editor
   back-to-voiceitt.sh      # Find Chrome window titled "Voiceitt Scratchpad", raise it
 bridge/
   dictate.html             # The Scratchpad page (light theme, autofocus, ⌘K to clear)

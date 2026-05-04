@@ -43,20 +43,20 @@ process, with VS Code as the first hand-built non-iTerm target.
 
 ### 0.2 README: "Adding a new shortcut" section
 
-- [ ] Add new top-level section to `README.md` titled **Adding a new shortcut**.
-- [ ] Document: how to find an app's bundle id
+- [x] Add new top-level section to `README.md` titled **Adding a new shortcut**.
+- [x] Document: how to find an app's bundle id
       (`osascript -e 'id of app "Visual Studio Code"'`, `lsappinfo`).
-- [ ] Document: which existing `send-to-*.sh` to start from
+- [x] Document: which existing `send-to-*.sh` to start from
       (AppleScript-capable target → `send-to-iterm.sh`; everything else →
       `send-to-vscode.sh` once it exists).
-- [ ] Document: the edit checklist (header comments, bundle id, paste step,
+- [x] Document: the edit checklist (header comments, bundle id, paste step,
       submit-key behaviour).
-- [ ] Document: `chmod +x` + Raycast symlink step.
-- [ ] Document: assigning the hotkey in Raycast.
-- [ ] Document: the **first-trigger permission prompts** the user should
+- [x] Document: `chmod +x` + Raycast symlink step.
+- [x] Document: assigning the hotkey in Raycast.
+- [x] Document: the **first-trigger permission prompts** the user should
       expect, and what to do if they were dismissed accidentally
       (`System Settings → Privacy & Security → Accessibility / Automation`).
-- [ ] Document: how to verify with Sticky Keys ON.
+- [x] Document: how to verify with Sticky Keys ON.
 
 ### 0.3 Helper: `scripts/new-shortcut.sh`
 
