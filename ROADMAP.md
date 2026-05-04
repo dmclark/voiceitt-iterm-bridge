@@ -81,6 +81,148 @@ guesses instead of what actually worked.
 
 ---
 
+## 0.5. Two-pane scratchpad + a little visual polish (prep for §1)
+
+**Priority: do this before §1.** The scratchpad is currently a single
+`<textarea>` that gets dictated into and then Cmd+A/Cmd+C'd straight onto
+the clipboard. As soon as we add the AI transformation pass from §1, that
+single field stops being enough: the user needs to see *both* what they
+actually said and what the model is about to paste, so they can sanity-check
+the rewrite before it lands in the destination app. Splitting the pane now
+— while there's still no LLM in the loop — lets us land the visual change
+on its own and keeps §1 a pure "wire up the transform" change.
+
+While we're in there, the page is also a bit utilitarian. A small,
+deliberate font + spacing pass costs almost nothing and makes the tool feel
+like something the user *wants* to leave open, which matters because it's
+literally the surface they stare at while dictating.
+
+### Goals
+
+1. **Two stacked fields in `bridge/dictate.html`:**
+   - **Top — "Dictated"**: the existing textarea. Voiceitt writes into this
+     one, exactly as today. Cmd+A/Cmd+C semantics on this field are
+     unchanged so the existing `send-to-*` scripts keep working with no
+     edits.
+   - **Bottom — "To be pasted"**: a second textarea, read-only for now (a
+     light-grey placeholder like *"Will mirror the dictated text until AI
+     post-processing is enabled (§1)."*). In v0.5 it just mirrors the top
+     field on input; in §1 it gets replaced by the LLM output. Editable in
+     §1 so the user can tweak before sending — read-only here just to keep
+     the v0.5 change behaviorally inert.
+2. **A header label per pane** (`Dictated` / `To be pasted`), small and
+   muted, so the split is obvious without screaming.
+3. **A typography pass** — see "Suggested font" below. Nothing heavy, no
+   webfont sprawl, no CSS framework.
+4. **Send scripts keep targeting the bottom field at send time.** In v0.5
+   that's a no-op (top and bottom are identical). The change here is just
+   updating `send-to-*.sh` to Cmd+A/Cmd+C the *bottom* textarea via a
+   `focus()` step so §1 doesn't have to touch bash at all.
+
+### Suggested font
+
+**Atkinson Hyperlegible** (Braille Institute, OFL-licensed, free on Google
+Fonts). Reasons:
+
+- Designed specifically for low-vision and accessibility use cases — a
+  thematic fit for a tool whose whole point is dictating instead of typing.
+- Has *character* (notice the `g`, `Q`, the slashed zero) without being
+  loud, so it reads as deliberate rather than default.
+- Renders cleanly at the textarea's existing 22 px size on macOS and
+  Chrome; doesn't need any weight tuning.
+- One font file, one `@import`, no icon set, no JS.
+
+Fallback chain stays system-native:
+
+```css
+font-family: "Atkinson Hyperlegible", -apple-system, BlinkMacSystemFont,
+             "SF Pro Text", system-ui, sans-serif;
+```
+
+If we'd rather not pull in a webfont at all, **Inter** (already cached on
+many machines) or just `ui-rounded` on macOS (gives SF Rounded for free,
+zero download) are both fine second choices. Avoid anything display-y or
+heavy (Fraunces, Space Grotesk Bold, etc.) — the page is a working
+surface, not a hero section.
+
+Other small touches in the same pass, all cheap:
+
+- Slightly warmer background (`#fafaf7` instead of pure `#ffffff`) so the
+  page reads as "scratchpad" rather than "blank document".
+- `border-radius: 8px` on each pane and a thin `#e6e6e1` divider between
+  them.
+- Header strip stays as-is structurally but picks up the new font.
+
+### Making the insertion point easier to find
+
+The current textarea uses the OS default caret: a 1-px black line that
+blinks 60 times a minute and gets lost the instant you look away. This is
+a real problem for a dictation surface — when you look back to see what
+Voiceitt produced, you want your eye to land on the caret in well under a
+second. A few low-cost CSS-only fixes, in increasing order of intrusiveness:
+
+1. **High-contrast caret colour.** One line:
+   ```css
+   textarea { caret-color: #ff3b30; }   /* macOS system red */
+   ```
+   This alone is the single biggest win — a saturated red 1-px caret on a
+   warm-white page is *much* easier to spot than the default black one,
+   even peripherally. Doesn't affect text colour, doesn't affect selection.
+2. **Make the caret physically taller and a hair thicker by bumping the
+   font size on the focused pane.** The caret height is the line-height of
+   the focused run of text; nothing else controls it. Going from 22 px →
+   26 px on the active textarea (and back to 22 px on the inactive one)
+   gives a noticeably chunkier caret without any custom rendering. Pair
+   with `transition: font-size 80ms ease;` so it doesn't feel jarring.
+3. **A "current line" highlight.** When a textarea is focused, paint the
+   line containing the caret with a faint band (`background:
+   linear-gradient(...)` driven by JS that watches `selectionStart` and
+   the computed line-height, or just `box-shadow: inset 0 0 0 9999px
+   rgba(255,235,150,0.18)` on `:focus` for the whole field as a cheap
+   stand-in). The cheap version — tinting the *whole focused field* — is
+   a one-line CSS change and already makes "which pane has the caret"
+   obvious; the per-line version is a follow-up if it's still not enough.
+4. **Pulse on focus / on caret-jump.** When the field gains focus or the
+   caret moves after being idle for >2 s, briefly (300 ms) animate a
+   `box-shadow` ring at the caret's location, or just flash the whole
+   focused pane's border from `#e6e6e1` → `#ff3b30` → back. Effectively a
+   "where did I leave off?" beacon. Implement with a small JS helper that
+   listens to `selectionchange` and `focus`.
+5. **Custom faux-caret (only if 1–4 still aren't enough).** Hide the
+   native caret with `caret-color: transparent` and overlay a `<div>`
+   positioned from `selectionStart` via a hidden mirror element — this is
+   how CodeMirror / Monaco / Slate do it. Lets us draw a 3 px-wide,
+   high-contrast, optionally non-blinking bar. It's the "real" fix but
+   involves a mirror-textarea trick and ~50 lines of JS, so reserve it for
+   if 1–4 don't move the needle.
+
+Recommended starting point for v0.5: ship **(1) + (2) + the cheap (3)
+focused-pane tint** in the same diff. They're collectively ~10 lines of
+CSS and one `:focus` selector, and together they answer "which pane am I
+in?" and "where in that pane is my caret?" without any JS. Save (4) and
+(5) for if those three aren't enough once they're in daily use.
+
+### Concrete plan
+
+| Step | Task | Notes |
+| ---- | ---- | ----- |
+| 1 | Refactor `bridge/dictate.html` to two stacked textareas in a flex column, with `Dictated` / `To be pasted` mini-labels above each. Keep `id="pad"` on the top one for backwards compat with any existing wiring. | Pure HTML/CSS change. |
+| 2 | Add an `input` listener on the top textarea that mirrors its value into the bottom one. This is the v0.5 stand-in for §1's transform. | One line of JS. |
+| 3 | Drop in the Atkinson Hyperlegible `@import` (or vendor a single woff2 into `bridge/` if we'd rather not hit Google Fonts), apply the font + warmer background + rounded panes. | Visual only. |
+| 4 | Update `send-to-iterm.sh` (and `-and-run`) to focus the *bottom* textarea before the Cmd+A/Cmd+C step — the simplest way is to give the bottom field a known `id` (e.g. `pad-out`) and have the script trigger a `focus()` via the existing AppleScript-driving-Chrome path, *or* just have the page itself keep focus on the bottom field whenever its contents change. Pick whichever is less invasive. | Behaviorally a no-op in v0.5 because top and bottom are identical. Sets §1 up to need zero bash changes. |
+| 5 | Smoke-test: dictate into the top pane, confirm the bottom pane mirrors live, confirm `Send to iTerm` still pastes the right text. Confirm Sticky Keys behavior is unchanged. | Same manual test as today. |
+
+### Out of scope for this item
+
+- Any LLM call (that's §1).
+- Making the bottom pane editable (deferred to §1, where editing it
+  actually means something).
+- A prompt picker (§1).
+- A diff view between the two panes (nice idea, but premature until we
+  have an LLM rewriting the bottom one).
+
+---
+
 ## 1. AI post-processing before paste
 
 ### Inspiration

@@ -92,6 +92,68 @@ process, with VS Code as the first hand-built non-iTerm target.
 
 ---
 
+## 0.5 Two-pane scratchpad + visual polish (prep for §1)
+
+Goal: split `bridge/dictate.html` into a "Dictated" + "To be pasted" pair,
+apply a light typography pass, and make the caret findable — all before
+any LLM work in §1.
+
+### 0.5.1 Two-pane layout
+
+- [ ] Refactor `bridge/dictate.html` into two stacked textareas in a flex
+      column.
+- [ ] Top textarea keeps `id="pad"` (back-compat with current send scripts).
+- [ ] Bottom textarea has its own id (e.g. `id="pad-out"`), `readonly` for v0.5.
+- [ ] Mini-labels above each pane: `Dictated` / `To be pasted`.
+- [ ] `input` listener on top pane mirrors its value into the bottom pane
+      (placeholder for §1's LLM transform).
+- [ ] Bottom pane shows a muted placeholder explaining it'll mirror the
+      top until §1 lands.
+
+### 0.5.2 Send-script retargeting
+
+- [ ] Update `send-to-iterm.sh` and `send-to-iterm-and-run.sh` to
+      Cmd+A/Cmd+C the **bottom** textarea (`pad-out`) instead of `pad`.
+- [ ] Same change in `send-to-vscode.sh` and any future `send-to-*.sh`
+      shipped by §0.3.
+- [ ] Smoke-test with Sticky Keys ON: dictate → bottom pane mirrors →
+      hotkey pastes the right text into iTerm and VS Code.
+
+### 0.5.3 Typography pass
+
+- [ ] Add Atkinson Hyperlegible (Google Fonts `@import` *or* a vendored
+      woff2 in `bridge/`) — pick one, document the choice in `bridge/`.
+- [ ] Apply font-family chain:
+      `"Atkinson Hyperlegible", -apple-system, BlinkMacSystemFont,
+      "SF Pro Text", system-ui, sans-serif`.
+- [ ] Warmer page background `#fafaf7` (was `#ffffff`).
+- [ ] `border-radius: 8px` on each pane, thin `#e6e6e1` divider between them.
+- [ ] Header strip picks up the new font.
+
+### 0.5.4 Caret visibility (starter combo)
+
+- [ ] `caret-color: #ff3b30` on both textareas.
+- [ ] Focused pane bumps `font-size` 22 px → 26 px with
+      `transition: font-size 80ms ease;`.
+- [ ] Focused pane gets a faint inset tint via
+      `box-shadow: inset 0 0 0 9999px rgba(255,235,150,0.18)` on `:focus`.
+- [ ] Verify caret is findable in <1 s after looking away (manual check,
+      Sticky Keys ON, both panes).
+- [-] Per-line highlight (deferred — only if the cheap focused-pane tint
+      isn't enough in daily use).
+- [-] Pulse-on-focus / pulse-on-caret-jump beacon (deferred — JS, follow-up).
+- [-] Custom faux-caret overlay (deferred — ~50 lines of JS, only if
+      1–3 above don't move the needle).
+
+### 0.5.5 Out of scope (explicit)
+
+- [-] LLM call (belongs to §1).
+- [-] Bottom pane editable (belongs to §1, where editing it means something).
+- [-] Prompt picker (belongs to §1).
+- [-] Diff view between panes (premature until §1 rewrites the bottom one).
+
+---
+
 ## 1. AI post-processing before paste
 
 Goal: insert a user-selectable LLM transformation between
