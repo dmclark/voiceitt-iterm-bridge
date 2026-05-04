@@ -25,19 +25,21 @@ process, with VS Code as the first hand-built non-iTerm target.
 
 ### 0.1 Prototype: hand-built `send-to-vscode.sh`
 
-- [ ] Copy `scripts/send-to-iterm.sh` → `scripts/send-to-vscode.sh`.
-- [ ] Replace iTerm AppleScript block with `cliclick`-based activate +
+- [x] Copy `scripts/send-to-iterm.sh` → `scripts/send-to-vscode.sh`.
+- [x] Replace iTerm AppleScript block with `cliclick`-based activate +
       Cmd+V targeting bundle id `com.microsoft.VSCode`.
-- [ ] Update Raycast header comments (`@raycast.title`,
+- [x] Update Raycast header comments (`@raycast.title`,
       `@raycast.description`, icon).
-- [ ] `chmod +x scripts/send-to-vscode.sh`.
-- [ ] Symlink into `~/.config/raycast/scripts/` (match `install.sh` convention).
-- [ ] Assign a hotkey in Raycast and trigger once to clear macOS permission
+- [x] `chmod +x scripts/send-to-vscode.sh`.
+- [x] Symlink into `~/.config/raycast/scripts/` (match `install.sh` convention).
+- [x] Assign a hotkey in Raycast and trigger once to clear macOS permission
       prompts (Accessibility for Raycast, automation for VS Code).
-- [ ] Verify end-to-end with **Sticky Keys ON**: dictate → hotkey → text
+- [x] Verify end-to-end with **Sticky Keys ON**: dictate → hotkey → text
       lands in active VS Code editor pane.
-- [ ] Note every manual fix-up that was required (focus issues, sleeps,
+- [-] Note every manual fix-up that was required (focus issues, sleeps,
       paste-target weirdness) in `notes-vscode.md` for feeding into 0.2 and 0.3.
+      *Dropped: prototype worked first try with no fix-ups needed (Sticky Keys ON
+      verified). Findings folded directly into 0.2/0.3 instead of a sidecar file.*
 
 ### 0.2 README: "Adding a new shortcut" section
 
