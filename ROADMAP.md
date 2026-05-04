@@ -513,6 +513,14 @@ answer.** Any design has to make that moment obvious instead of mysterious.
 
 ### Approach A — Per-target scripts via a generator (recommended)
 
+> **Builds on §0.** The minimal `scripts/new-shortcut.sh` shipped in §0
+> already implements the core of this approach (clone a chosen base script,
+> substitute the display name + bundle id, chmod +x, symlink via
+> `install.sh`). The work below is a graduation of that helper into a richer
+> generator with strategy templates, bundle-id auto-detection, and `& Run`
+> companions — *not* a from-scratch design. Anywhere this section says
+> "generator", read it as "extend `new-shortcut.sh`".
+
 Instead of one dynamic dispatcher that figures out the right strategy at
 runtime, ship a small **generator** that stamps out a new dedicated
 `send-to-<app>.sh` Raycast command for each app the user wants to target. The

@@ -19,6 +19,11 @@ for stale in send-to-amp.sh send-to-amp-and-run.sh; do
 done
 
 for f in "$REPO_DIR"/scripts/*.sh; do
+  # Only symlink real Raycast Script Commands. Helpers like new-shortcut.sh
+  # have no @raycast.schemaVersion header and should stay out of Raycast's dir.
+  if ! grep -q '^# @raycast\.schemaVersion' "$f"; then
+    continue
+  fi
   name="$(basename "$f")"
   target="$RAYCAST_DIR/$name"
   ln -sfn "$f" "$target"

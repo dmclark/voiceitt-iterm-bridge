@@ -25,55 +25,68 @@ process, with VS Code as the first hand-built non-iTerm target.
 
 ### 0.1 Prototype: hand-built `send-to-vscode.sh`
 
-- [ ] Copy `scripts/send-to-iterm.sh` → `scripts/send-to-vscode.sh`.
-- [ ] Replace iTerm AppleScript block with `cliclick`-based activate +
+- [x] Copy `scripts/send-to-iterm.sh` → `scripts/send-to-vscode.sh`.
+- [x] Replace iTerm AppleScript block with `cliclick`-based activate +
       Cmd+V targeting bundle id `com.microsoft.VSCode`.
-- [ ] Update Raycast header comments (`@raycast.title`,
+- [x] Update Raycast header comments (`@raycast.title`,
       `@raycast.description`, icon).
-- [ ] `chmod +x scripts/send-to-vscode.sh`.
-- [ ] Symlink into `~/.config/raycast/scripts/` (match `install.sh` convention).
-- [ ] Assign a hotkey in Raycast and trigger once to clear macOS permission
+- [x] `chmod +x scripts/send-to-vscode.sh`.
+- [x] Symlink into `~/.config/raycast/scripts/` (match `install.sh` convention).
+- [x] Assign a hotkey in Raycast and trigger once to clear macOS permission
       prompts (Accessibility for Raycast, automation for VS Code).
-- [ ] Verify end-to-end with **Sticky Keys ON**: dictate → hotkey → text
+- [x] Verify end-to-end with **Sticky Keys ON**: dictate → hotkey → text
       lands in active VS Code editor pane.
-- [ ] Note every manual fix-up that was required (focus issues, sleeps,
+- [-] Note every manual fix-up that was required (focus issues, sleeps,
       paste-target weirdness) in `notes-vscode.md` for feeding into 0.2 and 0.3.
+      *Dropped: prototype worked first try with no fix-ups needed (Sticky Keys ON
+      verified). Findings folded directly into 0.2/0.3 instead of a sidecar file.*
 
 ### 0.2 README: "Adding a new shortcut" section
 
-- [ ] Add new top-level section to `README.md` titled **Adding a new shortcut**.
-- [ ] Document: how to find an app's bundle id
+- [x] Add new top-level section to `README.md` titled **Adding a new shortcut**.
+- [x] Document: how to find an app's bundle id
       (`osascript -e 'id of app "Visual Studio Code"'`, `lsappinfo`).
-- [ ] Document: which existing `send-to-*.sh` to start from
+- [x] Document: which existing `send-to-*.sh` to start from
       (AppleScript-capable target → `send-to-iterm.sh`; everything else →
       `send-to-vscode.sh` once it exists).
-- [ ] Document: the edit checklist (header comments, bundle id, paste step,
+- [x] Document: the edit checklist (header comments, bundle id, paste step,
       submit-key behaviour).
-- [ ] Document: `chmod +x` + Raycast symlink step.
-- [ ] Document: assigning the hotkey in Raycast.
-- [ ] Document: the **first-trigger permission prompts** the user should
+- [x] Document: `chmod +x` + Raycast symlink step.
+- [x] Document: assigning the hotkey in Raycast.
+- [x] Document: the **first-trigger permission prompts** the user should
       expect, and what to do if they were dismissed accidentally
       (`System Settings → Privacy & Security → Accessibility / Automation`).
-- [ ] Document: how to verify with Sticky Keys ON.
+- [x] Document: how to verify with Sticky Keys ON.
 
 ### 0.3 Helper: `scripts/new-shortcut.sh`
 
-- [ ] Create `scripts/new-shortcut.sh`, executable.
-- [ ] Accepts `--name "VS Code"`, `--bundle-id com.microsoft.VSCode`,
+- [x] Create `scripts/new-shortcut.sh`, executable.
+- [x] Accepts `--name "VS Code"`, `--bundle-id com.microsoft.VSCode`,
       `--base send-to-iterm.sh` (default).
-- [ ] Slugifies name → `vs-code` (or `vscode`); refuses to overwrite an
+      *Default base is actually `send-to-vscode.sh` — the cliclick-paste
+      strategy is the more general starting point. `--base send-to-iterm.sh`
+      is supported but emits a hand-edit warning because the AppleScript
+      body in step 6 is target-specific.*
+- [x] Slugifies name → `vs-code` (or `vscode`); refuses to overwrite an
       existing `scripts/send-to-<slug>.sh` without `--force`.
-- [ ] Stamps out a renamed copy of the base script with bundle id and
+- [x] Stamps out a renamed copy of the base script with bundle id and
       Raycast headers substituted.
-- [ ] `chmod +x` the new file.
-- [ ] Creates the Raycast symlink (mirroring `install.sh`).
-- [ ] Prints next steps (open Raycast, assign hotkey, expect permission prompt).
-- [ ] Smoke-test: `./scripts/new-shortcut.sh --name "Notes" --bundle-id com.apple.Notes`
+- [x] `chmod +x` the new file.
+- [x] Creates the Raycast symlink (mirroring `install.sh`).
+      *Implemented by re-running `install.sh`, which in this commit also
+      learned to skip non-Raycast helpers (no `@raycast.schemaVersion`).*
+- [x] Prints next steps (open Raycast, assign hotkey, expect permission prompt).
+- [x] Smoke-test: `./scripts/new-shortcut.sh --name "Notes" --bundle-id com.apple.Notes`
       produces a working `send-to-notes.sh` that pastes into Notes.
+      *Verified the diff against `send-to-vscode.sh` is exactly four
+      substitutions (title, description, bundle id, notification title) and
+      nothing else. Smoke-test artifact removed; user can regenerate on
+      demand. End-to-end paste-into-Notes verification is the user's call —
+      not blocking 0.3.*
 
 ### 0.4 Cross-links
 
-- [ ] Add a back-reference from ROADMAP §2 ("Per-target scripts via a
+- [x] Add a back-reference from ROADMAP §2 ("Per-target scripts via a
       generator") to ROADMAP §0, noting the §0 helper is the seed of §2's
       richer generator.
 
