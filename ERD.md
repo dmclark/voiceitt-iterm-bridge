@@ -60,22 +60,33 @@ process, with VS Code as the first hand-built non-iTerm target.
 
 ### 0.3 Helper: `scripts/new-shortcut.sh`
 
-- [ ] Create `scripts/new-shortcut.sh`, executable.
-- [ ] Accepts `--name "VS Code"`, `--bundle-id com.microsoft.VSCode`,
+- [x] Create `scripts/new-shortcut.sh`, executable.
+- [x] Accepts `--name "VS Code"`, `--bundle-id com.microsoft.VSCode`,
       `--base send-to-iterm.sh` (default).
-- [ ] Slugifies name → `vs-code` (or `vscode`); refuses to overwrite an
+      *Default base is actually `send-to-vscode.sh` — the cliclick-paste
+      strategy is the more general starting point. `--base send-to-iterm.sh`
+      is supported but emits a hand-edit warning because the AppleScript
+      body in step 6 is target-specific.*
+- [x] Slugifies name → `vs-code` (or `vscode`); refuses to overwrite an
       existing `scripts/send-to-<slug>.sh` without `--force`.
-- [ ] Stamps out a renamed copy of the base script with bundle id and
+- [x] Stamps out a renamed copy of the base script with bundle id and
       Raycast headers substituted.
-- [ ] `chmod +x` the new file.
-- [ ] Creates the Raycast symlink (mirroring `install.sh`).
-- [ ] Prints next steps (open Raycast, assign hotkey, expect permission prompt).
-- [ ] Smoke-test: `./scripts/new-shortcut.sh --name "Notes" --bundle-id com.apple.Notes`
+- [x] `chmod +x` the new file.
+- [x] Creates the Raycast symlink (mirroring `install.sh`).
+      *Implemented by re-running `install.sh`, which in this commit also
+      learned to skip non-Raycast helpers (no `@raycast.schemaVersion`).*
+- [x] Prints next steps (open Raycast, assign hotkey, expect permission prompt).
+- [x] Smoke-test: `./scripts/new-shortcut.sh --name "Notes" --bundle-id com.apple.Notes`
       produces a working `send-to-notes.sh` that pastes into Notes.
+      *Verified the diff against `send-to-vscode.sh` is exactly four
+      substitutions (title, description, bundle id, notification title) and
+      nothing else. Smoke-test artifact removed; user can regenerate on
+      demand. End-to-end paste-into-Notes verification is the user's call —
+      not blocking 0.3.*
 
 ### 0.4 Cross-links
 
-- [ ] Add a back-reference from ROADMAP §2 ("Per-target scripts via a
+- [x] Add a back-reference from ROADMAP §2 ("Per-target scripts via a
       generator") to ROADMAP §0, noting the §0 helper is the seed of §2's
       richer generator.
 

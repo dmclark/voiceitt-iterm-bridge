@@ -5,7 +5,7 @@
 # @raycast.mode silent
 # @raycast.packageName Voiceitt
 # @raycast.icon 🟦
-# @raycast.description Copy from focused app (Voiceitt textarea) and paste into VS Code's active editor. Sticky-Keys safe via cliclick. Does NOT press Return.
+# @raycast.description Send to VS Code: copy from focused app (Voiceitt textarea), activate the target app, then synthetic Cmd+V into its focused control. Sticky-Keys safe via cliclick. Does NOT press Return.
 
 set -e
 CLICLICK="/opt/homebrew/bin/cliclick"
@@ -38,10 +38,12 @@ if [ "$CURRENT" = "$SENTINEL" ] || [ -z "$CURRENT" ]; then
   exit 1
 fi
 
-# 6) Activate VS Code and paste into whatever control currently has focus there.
-#    No AppleScript "tell app to paste" — VS Code has no useful scripting
-#    dictionary for editor paste, so we drive it with a synthetic Cmd+V via
-#    cliclick (same Sticky-Keys-safe approach as steps 2-3).
+# 6) Activate the target app and paste into whatever control currently has
+#    focus there. No AppleScript "tell app to paste" — most apps have no
+#    useful scripting dictionary for editor/text-field paste, so we drive it
+#    with a synthetic Cmd+V via cliclick (same Sticky-Keys-safe approach as
+#    steps 2-3). This is the generic cliclick-paste strategy used by every
+#    non-AppleScript send-to-*.sh script.
 osascript -e "tell application id \"$TARGET_BUNDLE_ID\" to activate"
 sleep 0.15
 "$CLICLICK" ku:cmd,alt,ctrl,shift,fn >/dev/null 2>&1 || true
