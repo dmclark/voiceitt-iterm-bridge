@@ -22,12 +22,68 @@
     }
     body { display: flex; flex-direction: column; }
     header { padding: 8px 14px; font-size: 12px; color: #666; border-bottom: 1px solid #e6e6e1; display: flex; justify-content: space-between; align-items: center; background: #f5f4ef; }
+    /*
+     * Two-pane layout (ROADMAP §0.5.1).
+     * Top = "Dictated" (live, what Voiceitt writes into).
+     * Bottom = "To be pasted" (read-only mirror today; §1 replaces this
+     *   with the LLM-transformed text, at which point it becomes editable).
+     * Each pane is a flex column: label strip + textarea. The two panes
+     * split the body 50/50 via flex:1.
+     */
+    .pane { flex: 1; display: flex; flex-direction: column; min-height: 0; padding: 8px 10px; box-sizing: border-box; }
+    .pane + .pane { border-top: 1px solid #e6e6e1; }
+    .pane-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: #888; padding: 2px 6px 6px; }
     textarea {
       flex: 1; width: 100%; box-sizing: border-box;
-      padding: 18px; border: 0; outline: none; resize: none;
+      padding: 14px 16px; border: 0; outline: none; resize: none;
       background: #fafaf7; color: #1a1a1a;
       font-family: "Atkinson Hyperlegible", -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
       font-size: 22px; line-height: 1.5;
+      border-radius: 8px;
+      /*
+       * Caret visibility (ROADMAP §0.5 / ERD 0.5.4).
+       * - High-contrast caret (macOS system red) is the single biggest win
+       *   for "where did I leave off?" on a warm-white scratchpad.
+       * - Focused pane bumps font-size 22 → 26 px (caret height tracks
+       *   line-height, so a chunkier caret falls out for free) with a
+       *   short transition so it doesn't feel jarring.
+       * - Focused pane also picks up a faint warm tint via inset
+       *   box-shadow, which doubles as "which pane has the caret?" once
+       *   the two-pane layout (0.5.1) lands.
+       */
+      caret-color: #ff3b30;
+      transition: font-size 80ms ease;
+    }
+    textarea:focus {
+      font-size: 26px;
+      box-shadow: inset 0 0 0 9999px rgba(255, 235, 150, 0.18);
+      /* Hide the native 1-px caret on the focused pane; the 3-px faux
+         caret below replaces it. Unfocused panes keep `caret-color:
+         #ff3b30` so a brief click-out still shows where you were. */
+      caret-color: transparent;
+    }
+    /*
+     * Faux caret (ROADMAP §0.5.4 step 5).
+     * The native caret is hard-coded to 1 px in every browser; there is no
+     * `caret-width` property. To get a chunkier "where am I?" bar we hide
+     * the native caret on focus (above) and overlay a 3-px <div> whose
+     * position is computed from a hidden mirror element that mirrors the
+     * textarea's text + styles up to `selectionStart`. Same trick
+     * CodeMirror / Monaco use.
+     */
+    #faux-caret {
+      position: fixed;
+      width: 3px;
+      background: #ff3b30;
+      pointer-events: none;
+      display: none;
+      z-index: 1000;
+      border-radius: 1px;
+      animation: faux-caret-blink 1.06s steps(1) infinite;
+    }
+    @keyframes faux-caret-blink {
+      0%, 50% { opacity: 1; }
+      50.01%, 100% { opacity: 0; }
     }
     button { background: #e6e6e1; color: #1a1a1a; border: 1px solid #cfcfc8; padding: 4px 10px; border-radius: 4px; font-size: 12px; font-family: inherit; cursor: pointer; }
     button:hover { background: #d8d8d2; }
@@ -38,27 +94,144 @@
     <span>Voiceitt Scratchpad — dictate here, then trigger your Raycast hotkey.</span>
     <button id="clear" title="Clear (⌘K)">Clear</button>
   </header>
-  <textarea id="pad" autofocus placeholder="Start dictating with Voiceitt…"></textarea>
+  <div class="pane">
+    <div class="pane-label">Dictated</div>
+    <textarea id="pad" autofocus placeholder="Start dictating with Voiceitt…"></textarea>
+  </div>
+  <div class="pane">
+    <div class="pane-label">To be pasted</div>
+    <textarea id="pad-out" readonly
+      placeholder="Will mirror the dictated text until AI post-processing is enabled (§1)."></textarea>
+  </div>
+  <div id="faux-caret" aria-hidden="true"></div>
 
   <script>
     const pad = document.getElementById('pad');
+    const padOut = document.getElementById('pad-out');
     const clearBtn = document.getElementById('clear');
+    const fauxCaret = document.getElementById('faux-caret');
 
-    // Always keep focus in the textarea so Cmd+A / Cmd+C target it.
+    // Always keep focus in the top (Dictated) textarea so Cmd+A / Cmd+C
+    // target it, and so the bottom (read-only) pane can never steal
+    // focus on a stray click.
     function refocus() { pad.focus(); }
     window.addEventListener('focus', refocus);
     document.addEventListener('click', (e) => { if (e.target !== clearBtn) refocus(); });
     setTimeout(refocus, 0);
 
-    clearBtn.addEventListener('click', () => { pad.value = ''; refocus(); });
+    // v0.5 placeholder for §1's LLM transform: mirror the top pane into
+    // the bottom one verbatim. §1 swaps this for a transform call.
+    pad.addEventListener('input', () => { padOut.value = pad.value; });
+
+    function clearAll() { pad.value = ''; padOut.value = ''; refocus(); updateFauxCaret(); }
+    clearBtn.addEventListener('click', clearAll);
 
     // Cmd+K to clear
     window.addEventListener('keydown', (e) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
-        pad.value = '';
+        clearAll();
       }
     });
+
+    /*
+     * Faux-caret positioning (ROADMAP §0.5.4 step 5).
+     *
+     * Build a hidden <div> that mirrors the textarea's box + text up to
+     * `selectionStart`, terminated by a zero-width <span>. The span's
+     * client rect is the caret position; copy its top/left/height onto
+     * the floating #faux-caret div.
+     *
+     * Relevant computed styles must match exactly or wrapping diverges
+     * from the textarea and the caret lands on the wrong line.
+     */
+    const MIRROR_PROPS = [
+      'direction', 'boxSizing',
+      'borderTopWidth', 'borderRightWidth', 'borderBottomWidth', 'borderLeftWidth',
+      'borderStyle',
+      'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft',
+      'fontStyle', 'fontVariant', 'fontWeight', 'fontStretch', 'fontSize',
+      'fontSizeAdjust', 'lineHeight', 'fontFamily',
+      'textAlign', 'textTransform', 'textIndent', 'textDecoration',
+      'letterSpacing', 'wordSpacing', 'tabSize',
+    ];
+
+    let mirror = null;
+    function getMirror() {
+      if (mirror) return mirror;
+      mirror = document.createElement('div');
+      mirror.setAttribute('aria-hidden', 'true');
+      Object.assign(mirror.style, {
+        position: 'absolute',
+        visibility: 'hidden',
+        whiteSpace: 'pre-wrap',
+        wordWrap: 'break-word',
+        overflow: 'hidden',
+        top: '0',
+        left: '-9999px',
+      });
+      document.body.appendChild(mirror);
+      return mirror;
+    }
+
+    function updateFauxCaret() {
+      const ta = document.activeElement;
+      if (!(ta instanceof HTMLTextAreaElement)) {
+        fauxCaret.style.display = 'none';
+        return;
+      }
+      const m = getMirror();
+      const cs = getComputedStyle(ta);
+      for (const p of MIRROR_PROPS) m.style[p] = cs[p];
+      m.style.width = ta.clientWidth + 'px';
+
+      const pos = ta.selectionStart;
+      const before = ta.value.substring(0, pos);
+      const after = ta.value.substring(pos) || '.';
+      m.textContent = before;
+      const marker = document.createElement('span');
+      marker.textContent = '\u200b';
+      m.appendChild(marker);
+      m.appendChild(document.createTextNode(after));
+
+      const taRect = ta.getBoundingClientRect();
+      const mRect = m.getBoundingClientRect();
+      const markerRect = marker.getBoundingClientRect();
+      const lineHeight = parseFloat(cs.lineHeight) || parseFloat(cs.fontSize) * 1.5;
+
+      fauxCaret.style.display = 'block';
+      fauxCaret.style.left = (taRect.left + (markerRect.left - mRect.left) - ta.scrollLeft) + 'px';
+      fauxCaret.style.top  = (taRect.top  + (markerRect.top  - mRect.top)  - ta.scrollTop)  + 'px';
+      fauxCaret.style.height = lineHeight + 'px';
+
+      // Restart blink so the caret is visible immediately after a move
+      // (rather than possibly mid-blink-off).
+      fauxCaret.style.animation = 'none';
+      // eslint-disable-next-line no-unused-expressions
+      fauxCaret.offsetHeight;
+      fauxCaret.style.animation = '';
+    }
+
+    // Recompute on anything that can move the caret.
+    ['input', 'click', 'keyup', 'focus', 'scroll', 'select'].forEach(evt => {
+      pad.addEventListener(evt, updateFauxCaret);
+    });
+    pad.addEventListener('blur', () => { fauxCaret.style.display = 'none'; });
+    document.addEventListener('selectionchange', updateFauxCaret);
+    window.addEventListener('resize', updateFauxCaret);
+
+    // Track the focus font-size transition so the caret stays glued to
+    // the cursor across the 80 ms 22→26 px ease.
+    pad.addEventListener('transitionrun', () => {
+      const start = performance.now();
+      const tick = (now) => {
+        updateFauxCaret();
+        if (now - start < 140) requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    });
+
+    requestAnimationFrame(updateFauxCaret);
   </script>
 </body>
 </html>
