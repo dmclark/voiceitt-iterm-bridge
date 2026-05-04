@@ -14,6 +14,73 @@ are deliberately out of scope for the first version — this doc is the plan for
 
 ---
 
+## 0. Adding a new shortcut/target (do this first)
+
+**Priority: next up.** Before any of the larger items below, the workflow for
+**adding a new `send-to-<app>` shortcut** needs to be a documented, repeatable
+process — not a copy-paste-and-edit improv session against
+`scripts/send-to-iterm.sh`. The first concrete trial of this is **adding a
+shortcut for VS Code** (manually, end-to-end), with the steps captured as we
+go so the next target after that is faster and more obvious.
+
+This is a deliberate stepping stone toward the generator described in §2:
+we want one or two real, hand-built `send-to-*` scripts to exist (and be in
+daily use) before we try to template them. Otherwise the templates encode
+guesses instead of what actually worked.
+
+### Goals
+
+1. **A user-facing "Add a new shortcut" section in the README** that walks
+   through the whole loop in order: pick a target app, find its bundle id,
+   copy the closest existing `send-to-*.sh`, edit the destination block,
+   `chmod +x`, symlink into Raycast's scripts dir, assign a hotkey, accept
+   the macOS Accessibility/automation permission prompts on first trigger,
+   verify with a Sticky-Keys-on dictation.
+2. **A first hand-built non-iTerm shortcut: `send-to-vscode.sh`.** Manually
+   authored from `send-to-iterm.sh`, using the `cliclick`-paste strategy
+   (VS Code has no useful AppleScript dictionary for "paste into the active
+   editor"). Treat this as the prototype the generator will later mimic.
+3. **A small helper script `scripts/new-shortcut.sh`** that automates the
+   mechanical parts of step 1 — slugify the target name, stamp out a new
+   `send-to-<slug>.sh` from a chosen base script, fill in the bundle id and
+   Raycast headers, `chmod +x`, and create the Raycast symlink. This is the
+   *minimum* generator: no templates, no strategy picker, just "clone this
+   existing script, rename it, point it at this app." The richer generator
+   from §2 supersedes it later.
+
+### Concrete plan
+
+| Step | Task | Notes |
+| ---- | ---- | ----- |
+| 1 | Manually add `scripts/send-to-vscode.sh` by copying `send-to-iterm.sh` and replacing the iTerm AppleScript block with a `cliclick`-based activate + Cmd+V into VS Code (`com.microsoft.VSCode`). | Captures the real-world friction the README + helper script need to address. |
+| 2 | Write the **README "Adding a new shortcut" section** based on what step 1 actually required — including how to find a bundle id (`osascript -e 'id of app "Visual Studio Code"'` or `lsappinfo`), and which permission prompts to expect on first run. | The doc is the deliverable, not a side-effect. |
+| 3 | Build `scripts/new-shortcut.sh`: a Raycast Script Command (or plain CLI) that takes `--name`, `--bundle-id`, and `--base` (defaults to `send-to-iterm.sh`), and produces a renamed, header-rewritten copy in `scripts/` plus the Raycast symlink. | One template, one substitution pass. No strategy picker yet. |
+| 4 | Verify the loop end-to-end: run `new-shortcut.sh --name "Notes" --bundle-id com.apple.Notes`, assign a hotkey in Raycast, dictate, send. Note any manual edits still required and feed them back into step 3. | This is what tells us the helper is "good enough." |
+| 5 | Cross-link from §2 ("Per-target scripts via a generator") back to this section, so the generator work picks up where the manual helper leaves off instead of starting from scratch. | Avoids re-litigating the design later. |
+
+### Why a small helper now, instead of jumping straight to §2's generator
+
+- §2's generator wants strategy templates (`applescript` vs.
+  `cliclick-paste`), bundle-id auto-detection, optional `&-and-run`
+  companions, and per-app submit-key defaults. That's a lot of design to
+  commit to before we've added a *single* non-iTerm target by hand.
+- The minimum useful automation — "clone an existing script, rename
+  everything, drop the symlink in" — saves 90% of the typing without
+  locking in any template decisions.
+- Doing VS Code manually first will surface concrete questions (does
+  `cliclick`'s Cmd+V land in the right pane? does VS Code need a focus
+  click first? does Sticky Keys interfere?) whose answers belong in the
+  README *and* in §2's eventual templates.
+
+### Out of scope for this item
+
+- Multiple strategy templates (deferred to §2).
+- Bundle-id auto-detection from frontmost app (deferred to §2).
+- A picker UI or per-target config file (deferred to §2 / §3).
+- Anything LLM-related (that's §1).
+
+---
+
 ## 1. AI post-processing before paste
 
 ### Inspiration
