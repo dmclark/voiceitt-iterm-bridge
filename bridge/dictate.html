@@ -4,18 +4,33 @@
   <meta charset="utf-8">
   <title>Voiceitt Scratchpad</title>
   <style>
-    html, body { margin: 0; padding: 0; height: 100%; background: #ffffff; color: #1a1a1a; font-family: -apple-system, BlinkMacSystemFont, "SF Pro", system-ui, sans-serif; }
+    /*
+     * Typography: Atkinson Hyperlegible (Braille Institute, OFL).
+     * Loaded from Google Fonts via @import for simplicity. Tradeoff: needs
+     * network on first page load; the file is then cached by Chrome. If
+     * we ever want fully-offline behaviour, vendor `atkinson-hyperlegible.woff2`
+     * into bridge/ and swap this @import for an @font-face rule.
+     * See ROADMAP §0.5.3 / ERD 0.5.3.
+     */
+    @import url('https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap');
+
+    html, body {
+      margin: 0; padding: 0; height: 100%;
+      /* Warmer scratchpad background — reads as "working surface", not "blank document". */
+      background: #fafaf7; color: #1a1a1a;
+      font-family: "Atkinson Hyperlegible", -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+    }
     body { display: flex; flex-direction: column; }
-    header { padding: 8px 14px; font-size: 12px; color: #666; border-bottom: 1px solid #e0e0e0; display: flex; justify-content: space-between; align-items: center; background: #f7f7f7; }
+    header { padding: 8px 14px; font-size: 12px; color: #666; border-bottom: 1px solid #e6e6e1; display: flex; justify-content: space-between; align-items: center; background: #f5f4ef; }
     textarea {
       flex: 1; width: 100%; box-sizing: border-box;
       padding: 18px; border: 0; outline: none; resize: none;
-      background: #ffffff; color: #1a1a1a;
-      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+      background: #fafaf7; color: #1a1a1a;
+      font-family: "Atkinson Hyperlegible", -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
       font-size: 22px; line-height: 1.5;
     }
-    button { background: #e0e0e0; color: #1a1a1a; border: 1px solid #c8c8c8; padding: 4px 10px; border-radius: 4px; font-size: 12px; cursor: pointer; }
-    button:hover { background: #d0d0d0; }
+    button { background: #e6e6e1; color: #1a1a1a; border: 1px solid #cfcfc8; padding: 4px 10px; border-radius: 4px; font-size: 12px; font-family: inherit; cursor: pointer; }
+    button:hover { background: #d8d8d2; }
   </style>
 </head>
 <body>

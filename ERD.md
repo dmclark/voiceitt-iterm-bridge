@@ -121,14 +121,23 @@ any LLM work in §1.
 
 ### 0.5.3 Typography pass
 
-- [ ] Add Atkinson Hyperlegible (Google Fonts `@import` *or* a vendored
+- [x] Add Atkinson Hyperlegible (Google Fonts `@import` *or* a vendored
       woff2 in `bridge/`) — pick one, document the choice in `bridge/`.
-- [ ] Apply font-family chain:
+      *Chose Google Fonts `@import` (weights 400 + 700, `display=swap`).
+      Documented in a comment block at the top of `bridge/dictate.html`'s
+      `<style>` with a note on how to swap to a vendored woff2 if we ever
+      need fully-offline behaviour.*
+- [x] Apply font-family chain:
       `"Atkinson Hyperlegible", -apple-system, BlinkMacSystemFont,
       "SF Pro Text", system-ui, sans-serif`.
-- [ ] Warmer page background `#fafaf7` (was `#ffffff`).
-- [ ] `border-radius: 8px` on each pane, thin `#e6e6e1` divider between them.
-- [ ] Header strip picks up the new font.
+- [x] Warmer page background `#fafaf7` (was `#ffffff`).
+- [~] `border-radius: 8px` on each pane, thin `#e6e6e1` divider between them.
+      *Deferred to 0.5.1: there's only one pane today. Header divider colour
+      already migrated to `#e6e6e1` so the rest is a one-liner once the
+      bottom pane lands.*
+- [x] Header strip picks up the new font.
+      *Inherits via the `body` font-family chain; header background also
+      shifted to `#f5f4ef` to harmonise with the new warmer page background.*
 
 ### 0.5.4 Caret visibility (starter combo)
 
