@@ -100,14 +100,19 @@ any LLM work in §1.
 
 ### 0.5.1 Two-pane layout
 
-- [ ] Refactor `bridge/dictate.html` into two stacked textareas in a flex
+- [x] Refactor `bridge/dictate.html` into two stacked textareas in a flex
       column.
-- [ ] Top textarea keeps `id="pad"` (back-compat with current send scripts).
-- [ ] Bottom textarea has its own id (e.g. `id="pad-out"`), `readonly` for v0.5.
-- [ ] Mini-labels above each pane: `Dictated` / `To be pasted`.
-- [ ] `input` listener on top pane mirrors its value into the bottom pane
+      *Each pane is its own `.pane` flex column (label + textarea), the
+      two panes split the body 50/50 via `flex: 1`.*
+- [x] Top textarea keeps `id="pad"` (back-compat with current send scripts).
+- [x] Bottom textarea has its own id (e.g. `id="pad-out"`), `readonly` for v0.5.
+- [x] Mini-labels above each pane: `Dictated` / `To be pasted`.
+- [x] `input` listener on top pane mirrors its value into the bottom pane
       (placeholder for §1's LLM transform).
-- [ ] Bottom pane shows a muted placeholder explaining it'll mirror the
+      *Cmd+K / Clear button now clear both panes; document-level click
+      handler still bounces focus back to `pad` so the read-only bottom
+      pane can't steal focus.*
+- [x] Bottom pane shows a muted placeholder explaining it'll mirror the
       top until §1 lands.
 
 ### 0.5.2 Send-script retargeting
@@ -121,29 +126,47 @@ any LLM work in §1.
 
 ### 0.5.3 Typography pass
 
-- [ ] Add Atkinson Hyperlegible (Google Fonts `@import` *or* a vendored
+- [x] Add Atkinson Hyperlegible (Google Fonts `@import` *or* a vendored
       woff2 in `bridge/`) — pick one, document the choice in `bridge/`.
-- [ ] Apply font-family chain:
+      *Chose Google Fonts `@import` (weights 400 + 700, `display=swap`).
+      Documented in a comment block at the top of `bridge/dictate.html`'s
+      `<style>` with a note on how to swap to a vendored woff2 if we ever
+      need fully-offline behaviour.*
+- [x] Apply font-family chain:
       `"Atkinson Hyperlegible", -apple-system, BlinkMacSystemFont,
       "SF Pro Text", system-ui, sans-serif`.
-- [ ] Warmer page background `#fafaf7` (was `#ffffff`).
-- [ ] `border-radius: 8px` on each pane, thin `#e6e6e1` divider between them.
-- [ ] Header strip picks up the new font.
+- [x] Warmer page background `#fafaf7` (was `#ffffff`).
+- [x] `border-radius: 8px` on each pane, thin `#e6e6e1` divider between them.
+      *Landed alongside 0.5.1. `border-radius: 8px` on `textarea`,
+      `border-top: 1px solid #e6e6e1` on `.pane + .pane` for the divider.*
+- [x] Header strip picks up the new font.
+      *Inherits via the `body` font-family chain; header background also
+      shifted to `#f5f4ef` to harmonise with the new warmer page background.*
 
 ### 0.5.4 Caret visibility (starter combo)
 
-- [ ] `caret-color: #ff3b30` on both textareas.
-- [ ] Focused pane bumps `font-size` 22 px → 26 px with
+- [x] `caret-color: #ff3b30` on both textareas.
+      *Applied to the `textarea` selector so it covers `pad` today and
+      the future `pad-out` (0.5.1) automatically.*
+- [x] Focused pane bumps `font-size` 22 px → 26 px with
       `transition: font-size 80ms ease;`.
-- [ ] Focused pane gets a faint inset tint via
+- [x] Focused pane gets a faint inset tint via
       `box-shadow: inset 0 0 0 9999px rgba(255,235,150,0.18)` on `:focus`.
-- [ ] Verify caret is findable in <1 s after looking away (manual check,
+- [~] Verify caret is findable in <1 s after looking away (manual check,
       Sticky Keys ON, both panes).
+      *Single-pane today, so the focus styling is structurally redundant
+      until 0.5.1 lands the second pane. Re-test then.*
 - [-] Per-line highlight (deferred — only if the cheap focused-pane tint
       isn't enough in daily use).
 - [-] Pulse-on-focus / pulse-on-caret-jump beacon (deferred — JS, follow-up).
-- [-] Custom faux-caret overlay (deferred — ~50 lines of JS, only if
-      1–3 above don't move the needle).
+- [x] Custom faux-caret overlay.
+      *Pulled forward: native `caret-color` is fixed at 1 px and the user
+      asked for a thicker bar. Implemented with the standard hidden-mirror
+      `<div>` trick (~70 lines, comments included). Native caret hidden
+      via `caret-color: transparent` on `:focus`; 3-px red `#faux-caret`
+      div overlaid; recomputes on input/click/keyup/focus/scroll/select,
+      `selectionchange`, resize, and across the 80 ms focus font-size
+      transition via a short rAF loop.*
 
 ### 0.5.5 Out of scope (explicit)
 
