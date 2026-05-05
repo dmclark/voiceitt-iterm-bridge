@@ -224,25 +224,33 @@ hotkey time — so the existing `send-to-*.sh` bash is unchanged from
 §0.5; all of §1's net-new logic lives in the page + a small CLI.
 
 <details open>
-<summary><h3 style="display:inline">1.1 Prompt config</h3></summary>
+<summary><h3 style="display:inline">1.1 Prompt files (one Markdown file per prompt)</h3></summary>
 
-- [ ] Author `prompts/default.md` as the human-editable source of truth
-      for the default `fix-dictation` system prompt (Markdown so it
-      reviews cleanly without JSON escaping).
-- [ ] Ship `bridge/prompts.default.json` with the starter prompt set from
-      ROADMAP §1 (`off`, `fix-dictation`, `shell-command`, `amp-prompt`,
-      `bullet-list`, `polite-email`, `gemini-rewrite`).
-- [ ] Top-level `"version": 1` in `prompts.default.json` so future
-      schema migrations have an anchor.
-- [ ] Build/install step inlines `prompts/default.md` as the `system`
-      field of the `fix-dictation` entry (so the Markdown stays the
-      canonical text).
-- [ ] `install.sh` copies the seeded JSON to
-      `~/.config/voiceitt-bridge/prompts.json` on first run; never
-      overwrites on subsequent runs (user edits stick).
-- [ ] Decide v1 default: ship with `default: "off"` (surprise-free) vs
-      `default: "fix-dictation"`. Recommend `off`; record the call here
-      when made.
+- [x] Author `prompts/default.md` as the canonical "fix dictation noise"
+      system prompt (the file body *is* the system message; no JSON,
+      no front matter, no escaping).
+- [ ] Ship a small starter set of additional `.md` files alongside it
+      so the dropdown isn't a list of one on first run
+      (e.g. `shell-command.md`, `bullet-list.md`, `polite-email.md`,
+      `amp-prompt.md`).
+- [ ] `install.sh` symlinks the repo's `prompts/` dir →
+      `~/.config/voiceitt-bridge/prompts/` (idempotent, same convention
+      already used for `bridge/dictate.html` and the Raycast scripts).
+      User-added `.md` files in that directory survive re-installs;
+      user edits to `default.md` (if they un-symlinked it) are never
+      overwritten.
+- [ ] **No `prompts.json`**, no top-level schema version, no `jq`-based
+      lookup. Prompt id = filename (e.g. `default.md`); display label =
+      filename minus `.md`, with `-`/`_` → spaces, title-cased
+      (`polite-email.md` → `Polite email`).
+- [ ] **No per-prompt `provider`/`model` in v1.** Project-wide defaults
+      come from `$VOICEITT_PROVIDER` (default `anthropic`) and
+      `$VOICEITT_MODEL` (default `claude-haiku-4-5`). Per-prompt
+      overrides via optional YAML front matter are a planned follow-up,
+      not v1.
+- [ ] Decide v1 first-load default: select `default.md` (most users
+      benefit) vs the synthesised `Off — paste as dictated` entry
+      (surprise-free). Recommend `Off`; record the call here when made.
 
 </details>
 
@@ -251,11 +259,14 @@ hotkey time — so the existing `send-to-*.sh` bash is unchanged from
 
 - [ ] Add `<select id="prompt-picker">` to `bridge/dictate.html` header,
       between the title and the Clear button.
-- [ ] Populate options from `fetch('/prompts.json')` at page load.
-- [ ] First option always **`Off — paste as dictated`** (regardless of
-      file order).
-- [ ] Persist current selection to `localStorage` so it survives reloads.
-- [ ] On change, write the chosen prompt id to
+- [ ] Populate options at page load from a `GET /prompts/` directory
+      listing served by the local bridge server (one option per `.md`
+      file). Display label derived from filename per §1.1.
+- [ ] First option is always the synthesised **`Off — paste as
+      dictated`** (not a file on disk; the picker prepends it).
+- [ ] Persist current selection (filename, or the literal string `off`)
+      to `localStorage` so it survives reloads.
+- [ ] On change, write the chosen filename (or `off`) to
       `~/.config/voiceitt-bridge/active-prompt` via a small
       `POST /active-prompt` endpoint added to the local bridge server.
 - [ ] Add a `↻ Re-run` button next to the picker; enabled iff
@@ -291,11 +302,18 @@ hotkey time — so the existing `send-to-*.sh` bash is unchanged from
 <summary><h3 style="display:inline">1.4 Local server endpoint for picker → CLI handoff</h3></summary>
 
 - [ ] Replace `python3 -m http.server` (or extend it) with a tiny
-      handler that serves the `bridge/` dir **and** accepts
-      `POST /active-prompt` with body `{ "id": "<prompt-id>" }`,
-      writing it to `~/.config/voiceitt-bridge/active-prompt`.
+      handler that serves the `bridge/` dir **and**:
+  - [ ] `GET /prompts/` returns a JSON array of `.md` filenames in
+        `~/.config/voiceitt-bridge/prompts/` (used by §1.2's picker).
+  - [ ] `POST /active-prompt` with body `{ "id": "<filename>" }` (or
+        `{ "id": "off" }`) writes that string to
+        `~/.config/voiceitt-bridge/active-prompt`.
 - [ ] Document the chosen impl (Python `http.server` subclass, Node
       one-liner, etc.) in `bridge/`.
+- [ ] *(Foreshadow §1.5.1):* leave room for this endpoint to grow into a
+      general `POST /transform` handler that also accepts the rolling
+      session-context buffer; don't bake the sidecar shape so deeply
+      that the upgrade requires a rewrite.
 
 </details>
 
@@ -303,12 +321,18 @@ hotkey time — so the existing `send-to-*.sh` bash is unchanged from
 <summary><h3 style="display:inline">1.5 Transformer CLI</h3></summary>
 
 - [ ] Create `scripts/voiceitt-transform` (bash + curl + jq).
-- [ ] Reads stdin; reads active prompt id from
+- [ ] Reads stdin; reads active prompt filename from
       `~/.config/voiceitt-bridge/active-prompt`, falling back to
-      `prompts.json`'s `default`.
-- [ ] Looks up prompt definition in `prompts.json` (`provider`, `model`,
-      `system`).
-- [ ] If `provider` is `off` (or empty) → echo stdin unchanged, exit 0.
+      `default.md` if the file is missing/empty.
+- [ ] If the active value is the literal `off` (or empty) → echo stdin
+      unchanged, exit 0.
+- [ ] Loads the system prompt by reading
+      `~/.config/voiceitt-bridge/prompts/<filename>` verbatim (whole
+      file body is the system message — no JSON, no front-matter
+      parsing in v1).
+- [ ] Provider/model come from project-wide env vars
+      `$VOICEITT_PROVIDER` (default `anthropic`) and `$VOICEITT_MODEL`
+      (default `claude-haiku-4-5`). **No per-prompt overrides in v1.**
 - [ ] Provider branches: `anthropic`, `openai`, `google` (AI Studio
       Gemini API), `ollama` (`http://localhost:11434`).
 - [ ] Hard timeout via `curl --max-time "$VOICEITT_TRANSFORM_TIMEOUT"`
@@ -317,8 +341,8 @@ hotkey time — so the existing `send-to-*.sh` bash is unchanged from
 - [ ] Honour `$VOICEITT_BRIDGE_CONFIG` to override config dir (useful
       for testing).
 - [ ] Document required env vars: `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`,
-      `GOOGLE_API_KEY`, `VOICEITT_BRIDGE_CONFIG`,
-      `VOICEITT_TRANSFORM_TIMEOUT`.
+      `GOOGLE_API_KEY`, `VOICEITT_BRIDGE_CONFIG`, `VOICEITT_PROVIDER`,
+      `VOICEITT_MODEL`, `VOICEITT_TRANSFORM_TIMEOUT`.
 - [ ] Document the `~/.config/voiceitt-bridge/env` fallback file
       (sourced by `send-to-*.sh` for users whose Raycast doesn't inherit
       shell env).
@@ -343,10 +367,16 @@ hotkey time — so the existing `send-to-*.sh` bash is unchanged from
 
 - [ ] New top-level section: **Optional: AI transformation before paste**.
 - [ ] Picker screenshot.
-- [ ] Env-var setup walkthrough (per provider).
-- [ ] `prompts.json` example + how to add a new prompt.
-- [ ] Note that editing `prompts/default.md` + reseeding is how the
-      `fix-dictation` prompt is changed.
+- [ ] Env-var setup walkthrough (per provider), including
+      `VOICEITT_PROVIDER` / `VOICEITT_MODEL` for choosing the
+      project-wide default model.
+- [ ] "Adding a new prompt" walkthrough: drop a new `.md` file into
+      `prompts/`, save, reload the scratchpad tab. No JSON, no
+      restart.
+- [ ] Note that editing `prompts/default.md` (in place) is how the
+      default "fix dictation noise" prompt is changed — the symlink
+      means the file the user edits *is* the file the transformer
+      reads.
 
 </details>
 
@@ -359,9 +389,13 @@ hotkey time — so the existing `send-to-*.sh` bash is unchanged from
 - [-] Per-destination prompt defaults (post-v1; layer on top of picker).
 - [-] History / undo of dictated → transformed pairs.
 - [-] "Hey AI, …" ad-hoc command syntax (deferred; picker covers ~90%).
-- [-] SQLite-backed prompt store (deferred; JSON is the v1 contract,
-      migration is contained because the rest of the system only sees
-      "give me the active prompt's `system` + `provider`").
+- [-] Per-prompt `provider` / `model` overrides via YAML front matter
+      (deferred; v1 uses project-wide `$VOICEITT_PROVIDER` /
+      `$VOICEITT_MODEL` for everything).
+- [-] SQLite-backed prompt store (deferred; "directory of `.md` files"
+      is the v1 contract, and the migration is contained because the
+      rest of the system only ever sees "give me the active prompt's
+      system text").
 
 </details>
 
