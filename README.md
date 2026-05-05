@@ -206,4 +206,4 @@ install.sh                 # Symlinks scripts and html to their runtime location
 
 Two larger pieces of follow-up work — pluggable paste target (any app, not
 just iTerm) and a possible Raycast store extension — are planned in
-[ROADMAP.md](./ROADMAP.md).
+[ROADMAP.md](./notes/ROADMAP.md).
