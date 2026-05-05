@@ -219,8 +219,14 @@
           signal: inFlight.signal,
         });
         if (!r.ok) throw new Error('HTTP ' + r.status + ' ' + (await r.text()).slice(0, 200));
-        padOut.value = await r.text();
-        setStatus('ok', 'ok');
+        const cleaned = await r.text();
+        // Debug visibility — open DevTools (⌥⌘I) → Console to see each
+        // round-trip. Cheap, removable, makes "is the LLM doing nothing
+        // vs is it returning something different I can't tell apart"
+        // distinguishable.
+        console.log('[transform]', {input: text, output: cleaned, changed: cleaned !== text});
+        padOut.value = cleaned;
+        setStatus(cleaned === text ? 'ok (unchanged)' : 'ok', 'ok');
       } catch (err) {
         if (err.name === 'AbortError') return;
         // Fail-open: never block the user. Drop the raw text into the

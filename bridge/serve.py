@@ -49,6 +49,14 @@ TRANSFORM_CMD = os.environ.get(
 HARD_TIMEOUT = float(os.environ.get("VOICEITT_TRANSFORM_HARD_TIMEOUT", "10"))
 
 
+def _snip(s, n=120):
+    """Truncate text for log lines so server.log stays grep-able."""
+    s = s or ""
+    if len(s) <= n:
+        return s
+    return s[: n - 1] + "…"
+
+
 class Handler(SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=SERVE_DIR, **kwargs)
@@ -102,8 +110,8 @@ class Handler(SimpleHTTPRequestHandler):
             # Surface stderr in the server log; the page treats any non-2xx
             # as "fail open with raw text" so the user is never blocked.
             sys.stderr.write(
-                "voiceitt-transform exit %d:\n%s\n"
-                % (result.returncode, (result.stderr or "").rstrip())
+                "voiceitt-transform exit %d on input %r:\n%s\n"
+                % (result.returncode, _snip(text), (result.stderr or "").rstrip())
             )
             self.send_error(
                 502,
@@ -111,6 +119,13 @@ class Handler(SimpleHTTPRequestHandler):
             )
             return
 
+        # Debug visibility — log each round-trip's input/output snippet to
+        # server.log so behaviour is inspectable without DevTools.
+        sys.stderr.write(
+            "transform: in=%r out=%r%s\n"
+            % (_snip(text), _snip(result.stdout),
+               " (unchanged)" if result.stdout == text else "")
+        )
         self._send_text(200, result.stdout)
 
     def _send_text(self, status, body):
