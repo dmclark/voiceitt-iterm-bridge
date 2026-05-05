@@ -380,9 +380,12 @@ the existing send hotkeys still pick up the raw text from `pad`.
 - [ ] Document required env vars: `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`,
       `GOOGLE_API_KEY`, `VOICEITT_BRIDGE_CONFIG`, `VOICEITT_PROVIDER`,
       `VOICEITT_MODEL`, `VOICEITT_TRANSFORM_TIMEOUT`.
-- [ ] Document the `~/.config/voiceitt-bridge/env` fallback file
-      (sourced by `send-to-*.sh` and/or `serve.py` for users whose
-      Raycast doesn't inherit shell env).
+- [x] `~/.config/voiceitt-bridge/env` fallback file: sourced by
+      `scripts/open-voiceitt.sh` before launching `serve.py`, so the
+      server (and the `voiceitt-transform` subprocess it spawns)
+      inherits `GOOGLE_API_KEY` etc. even when Raycast didn't inherit
+      them from the user's interactive shell. Plain `KEY=value` lines;
+      gitignored. README walkthrough is still owed (§1.7).
 
 </details>
 

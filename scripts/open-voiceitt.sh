@@ -12,6 +12,18 @@ PAD_PORT=7531
 PAD_URL="http://localhost:${PAD_PORT}/dictate.html"
 PAD_TITLE="Voiceitt Scratchpad"
 LOG_FILE="$PAD_DIR/server.log"
+ENV_FILE="$PAD_DIR/env"
+
+# Source $PAD_DIR/env if it exists, so server.py + voiceitt-transform see
+# secrets like $GOOGLE_API_KEY even when Raycast didn't inherit them from
+# the user's shell. Plain `KEY=value` lines (no `export` needed); see
+# ROADMAP §1 open question #3 / ERD §1.5.
+if [ -f "$ENV_FILE" ]; then
+  set -a
+  # shellcheck disable=SC1090
+  . "$ENV_FILE"
+  set +a
+fi
 
 # 1) If a Chrome window with our title is already open, just bring it forward.
 ALREADY_OPEN=$(osascript <<EOF
