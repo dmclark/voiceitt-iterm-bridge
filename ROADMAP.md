@@ -16,6 +16,11 @@ are deliberately out of scope for the first version — this doc is the plan for
 
 ## 0. Adding a new shortcut/target (do this first)
 
+**Status: complete.** Shipped in [PR #1](https://github.com/dmclark/voiceitt-iterm-bridge/pull/1). The
+hand-built `send-to-vscode.sh`, README "Adding a new shortcut" section,
+and the `scripts/new-shortcut.sh` helper all landed; see ERD §0 for the
+ticked checklist.
+
 **Priority: next up.** Before any of the larger items below, the workflow for
 **adding a new `send-to-<app>` shortcut** needs to be a documented, repeatable
 process — not a copy-paste-and-edit improv session against
@@ -82,6 +87,15 @@ guesses instead of what actually worked.
 ---
 
 ## 0.5. Two-pane scratchpad + a little visual polish (prep for §1)
+
+**Status: largely complete.** Shipped in [PR #2](https://github.com/dmclark/voiceitt-iterm-bridge/pull/2):
+two-pane layout, mirror-on-input wiring, Atkinson Hyperlegible
+typography pass, warmer background + rounded panes, caret-visibility
+combo (high-contrast colour + focus font-size bump + focused-pane tint
++ custom faux-caret overlay). **Still pending:** ERD §0.5.2 — updating
+the `send-to-*.sh` scripts to Cmd+A/Cmd+C the bottom (`pad-out`)
+textarea instead of the top one. That's the last remaining block before
+§1 can build on top.
 
 **Priority: do this before §1.** The scratchpad is currently a single
 `<textarea>` that gets dictated into and then Cmd+A/Cmd+C'd straight onto
