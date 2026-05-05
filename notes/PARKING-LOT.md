@@ -11,6 +11,8 @@ Format: `- YYYY-MM-DD  one-line idea`. Group by theme.
 
 ## Scratchpad
 
+- 2026-05-05  log original dictation + corrected text (sqlite?) to potentially submit corrections back to Voiceitt for model training
+
 ## Tooling / workflow
 
 ## Misc
