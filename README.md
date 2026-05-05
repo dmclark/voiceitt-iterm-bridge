@@ -1,5 +1,9 @@
 # voiceitt-iterm-bridge
 
+**[📖 README](./README.md)** · **[🗺 Roadmap](./notes/ROADMAP.md)** · **[🧩 ERD](./notes/ERD.md)** · **[🅿️ Parking lot](./notes/PARKING-LOT.md)**
+
+---
+
 A small toolkit that lets you dictate prompts with [Voiceitt](https://www.voiceitt.com/)
 (a Chrome-only voice dictation extension) and send them straight into the
 **current iTerm tab** — whatever shell, REPL, or CLI tool (Amp, Claude Code,
