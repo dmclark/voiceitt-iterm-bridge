@@ -179,43 +179,196 @@ any LLM work in §1.
 
 ## 1. AI post-processing before paste
 
-Goal: insert a user-selectable LLM transformation between
-clipboard-capture and destination-paste.
+Goal: insert a user-selectable LLM transformation **between the input
+field (top) and the output field (bottom)** of the §0.5 two-pane
+scratchpad. The transform fires when Voiceitt finishes a phrase, not at
+hotkey time — so the existing `send-to-*.sh` bash is unchanged from
+§0.5; all of §1's net-new logic lives in the page + a small CLI.
 
 ### 1.1 Prompt config
 
-- [ ] Ship `bridge/prompts.default.json` with the starter prompt set from ROADMAP §1.
-- [ ] `install.sh` copies it to `~/.config/voiceitt-bridge/prompts.json`
-      on first run, never overwrites on subsequent runs.
+- [ ] Author `prompts/default.md` as the human-editable source of truth
+      for the default `fix-dictation` system prompt (Markdown so it
+      reviews cleanly without JSON escaping).
+- [ ] Ship `bridge/prompts.default.json` with the starter prompt set from
+      ROADMAP §1 (`off`, `fix-dictation`, `shell-command`, `amp-prompt`,
+      `bullet-list`, `polite-email`, `gemini-rewrite`).
+- [ ] Top-level `"version": 1` in `prompts.default.json` so future
+      schema migrations have an anchor.
+- [ ] Build/install step inlines `prompts/default.md` as the `system`
+      field of the `fix-dictation` entry (so the Markdown stays the
+      canonical text).
+- [ ] `install.sh` copies the seeded JSON to
+      `~/.config/voiceitt-bridge/prompts.json` on first run; never
+      overwrites on subsequent runs (user edits stick).
+- [ ] Decide v1 default: ship with `default: "off"` (surprise-free) vs
+      `default: "fix-dictation"`. Recommend `off`; record the call here
+      when made.
 
 ### 1.2 Scratchpad picker UI
 
-- [ ] Add `<select>` to `bridge/dictate.html` header next to the Clear button.
+- [ ] Add `<select id="prompt-picker">` to `bridge/dictate.html` header,
+      between the title and the Clear button.
 - [ ] Populate options from `fetch('/prompts.json')` at page load.
-- [ ] First option always **`Off — paste as dictated`**.
-- [ ] Persist current selection to `localStorage`.
-- [ ] On change, write the selected prompt id to
-      `~/.config/voiceitt-bridge/active-prompt` (via a tiny POST endpoint
-      on the local server).
+- [ ] First option always **`Off — paste as dictated`** (regardless of
+      file order).
+- [ ] Persist current selection to `localStorage` so it survives reloads.
+- [ ] On change, write the chosen prompt id to
+      `~/.config/voiceitt-bridge/active-prompt` via a small
+      `POST /active-prompt` endpoint added to the local bridge server.
+- [ ] Add a `↻ Re-run` button next to the picker; enabled iff
+      `inputField.value !== lastInputSentToLLM`.
+- [ ] Bind `⌘↵` (while the input field is focused) to the same action as
+      the Re-run button.
 
-### 1.3 Transformer CLI
+### 1.3 Trigger logic in `bridge/dictate.html`
+
+- [ ] **Auto-trigger:** latch a `voiceittWriting` flag on any
+      synthetic (`isTrusted: false`) `paste` event on the input field
+      (capture phase); consume on the next `input` event; debounce
+      ~700 ms before firing the transform. (Captures the
+      `execCommand('insertHTML')` Voiceitt signature documented in
+      ROADMAP §1 "Trigger mechanics".)
+- [ ] **Manual trigger:** Re-run button + `⌘↵` call the same function
+      as the auto-trigger.
+- [ ] After every successful transform, set
+      `lastInputSentToLLM = inputField.value` so the Re-run button
+      goes dark.
+- [ ] Editing the **output** field directly is allowed (output becomes
+      editable here, removing the `readonly` from §0.5.1) and does **not**
+      affect `lastInputSentToLLM`.
+- [ ] When the active prompt is `off`, the transform function is
+      identity (`output = input`); no special-casing needed elsewhere.
+
+### 1.4 Local server endpoint for picker → CLI handoff
+
+- [ ] Replace `python3 -m http.server` (or extend it) with a tiny
+      handler that serves the `bridge/` dir **and** accepts
+      `POST /active-prompt` with body `{ "id": "<prompt-id>" }`,
+      writing it to `~/.config/voiceitt-bridge/active-prompt`.
+- [ ] Document the chosen impl (Python `http.server` subclass, Node
+      one-liner, etc.) in `bridge/`.
+
+### 1.5 Transformer CLI
 
 - [ ] Create `scripts/voiceitt-transform` (bash + curl + jq).
 - [ ] Reads stdin; reads active prompt id from
-      `~/.config/voiceitt-bridge/active-prompt`.
-- [ ] Looks up prompt definition in `prompts.json`.
-- [ ] If prompt id is `off` → echo stdin unchanged, exit 0.
-- [ ] Otherwise POST to provider (Anthropic / Google) with prompt's
-      `system` text; print response on stdout.
-- [ ] Non-zero exit → caller falls back to raw text (fail-open).
-- [ ] Document required env vars (`ANTHROPIC_API_KEY`, `GOOGLE_API_KEY`).
+      `~/.config/voiceitt-bridge/active-prompt`, falling back to
+      `prompts.json`'s `default`.
+- [ ] Looks up prompt definition in `prompts.json` (`provider`, `model`,
+      `system`).
+- [ ] If `provider` is `off` (or empty) → echo stdin unchanged, exit 0.
+- [ ] Provider branches: `anthropic`, `openai`, `google` (AI Studio
+      Gemini API), `ollama` (`http://localhost:11434`).
+- [ ] Hard timeout via `curl --max-time "$VOICEITT_TRANSFORM_TIMEOUT"`
+      (default `2.5`); on timeout/non-zero exit, caller falls back to
+      raw text (fail-open).
+- [ ] Honour `$VOICEITT_BRIDGE_CONFIG` to override config dir (useful
+      for testing).
+- [ ] Document required env vars: `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`,
+      `GOOGLE_API_KEY`, `VOICEITT_BRIDGE_CONFIG`,
+      `VOICEITT_TRANSFORM_TIMEOUT`.
+- [ ] Document the `~/.config/voiceitt-bridge/env` fallback file
+      (sourced by `send-to-*.sh` for users whose Raycast doesn't inherit
+      shell env).
 
-### 1.4 Send-script integration
+### 1.6 Page-side integration (the LLM POST)
 
-- [ ] In each `send-to-*.sh`, after the "copy fired" sentinel and before
-      the paste, pipe `$CURRENT` through `voiceitt-transform` if it's on `$PATH`.
-- [ ] On transformer failure, fall back to `$CURRENT` unchanged.
-- [ ] Verify Sticky-Keys preamble is unaffected.
+- [ ] On auto/manual trigger, the page POSTs the input text +
+      active-prompt id to a local endpoint that shells out to
+      `voiceitt-transform`, **or** the page calls the provider API
+      directly and writes the result into the output field. Pick one;
+      record the choice here.
+- [ ] Whichever path wins, send-scripts stay unchanged from §0.5
+      (already targeting the bottom pane).
+
+### 1.7 README
+
+- [ ] New top-level section: **Optional: AI transformation before paste**.
+- [ ] Picker screenshot.
+- [ ] Env-var setup walkthrough (per provider).
+- [ ] `prompts.json` example + how to add a new prompt.
+- [ ] Note that editing `prompts/default.md` + reseeding is how the
+      `fix-dictation` prompt is changed.
+
+### 1.8 Out of scope for v1 (explicit)
+
+- [-] Streaming insertion (one round-trip, one paste).
+- [-] Screen / clipboard context capture beyond the dictated text.
+- [-] In-app prompt editor (post-v1; pairs with SQLite migration).
+- [-] Per-destination prompt defaults (post-v1; layer on top of picker).
+- [-] History / undo of dictated → transformed pairs.
+- [-] "Hey AI, …" ad-hoc command syntax (deferred; picker covers ~90%).
+- [-] SQLite-backed prompt store (deferred; JSON is the v1 contract,
+      migration is contained because the rest of the system only sees
+      "give me the active prompt's `system` + `provider`").
+
+---
+
+## 1.5 Session context + learned-corrections memory (extension of §1)
+
+Goal: lift the LLM rewrite quality (§1) above what stateless,
+single-utterance prompting can do — *without* changing Voiceitt's own
+recogniser, which we don't control. Two mechanisms, A then B.
+
+### 1.5.1 Mechanism A — rolling session context
+
+- [ ] In `bridge/dictate.html`, keep an in-memory ring buffer of the last
+      5 `(input, output)` pairs for the current session (cleared on
+      reload or on prompt-picker change).
+- [ ] On every transform request, POST the ring buffer alongside the
+      current utterance (means §1.4's `POST /active-prompt` endpoint
+      grows into a general `POST /transform` request handler).
+- [ ] In `voiceitt-transform`, prepend a "Recent dictation in this
+      session, for disambiguation only — do not repeat or summarise"
+      block to the user message; cap at 800 tokens of context (5
+      utterances *or* 800 tokens, whichever first).
+- [ ] Add a `?context=0` query-string flag to the page that disables
+      the context block, for quick A/B against the stateless baseline.
+- [ ] Verify on a real session: dictate a project name (e.g.
+      `Voiceitt`), correct it once in the input field, confirm the next
+      utterance keeps the corrected capitalisation without further help.
+
+### 1.5.2 Mechanism B — learned-corrections memory
+
+- [ ] Define `~/.config/voiceitt-bridge/corrections.jsonl` schema:
+      `{ts, prompt_id, voiceitt_raw, llm_output, user_final}` per line.
+- [ ] In each `send-to-*.sh`, at the moment the hotkey actually fires,
+      compare `lastInputSentToLLM` / `lastLLMOutput` (read from the
+      page via a small endpoint) to the live input/output field
+      contents; if non-trivially different, append a JSONL row.
+- [ ] In `voiceitt-transform`, after loading the prompt, scan the JSONL
+      for rows whose `voiceitt_raw` shares a changed-substring of
+      length ≥ 4 with the current utterance; pick top-K most-recent
+      (K = 4) and inject as few-shot examples in the system prompt.
+- [ ] Cap added context: K × ~80 tokens ≈ 320 tokens, on top of A's
+      800 → ~1.1k total context budget per call.
+- [ ] **Forget-affordance:** ship in the same PR as B itself — either a
+      `scripts/voiceitt-corrections` CLI with a `forget <substring>`
+      subcommand, or a "delete last correction" button in the
+      scratchpad header. Non-negotiable.
+- [ ] Privacy README: explicit note that `corrections.jsonl` is a
+      personal dictation log, never leaves the machine, and is excluded
+      from any future sync story without explicit opt-in.
+
+### 1.5.3 Sequencing
+
+- [ ] Ship 1.5.1 (Mechanism A) on its own; live on it for ≥ 1 week.
+- [ ] Re-evaluate whether 1.5.2 is worth building based on what A
+      *fails* to absorb in real use (i.e. recurring corrections that
+      keep falling out of the rolling window).
+- [ ] Only then ship 1.5.2 + the forget-affordance + privacy README in
+      one PR.
+
+### 1.5.4 Out of scope (explicit)
+
+- [-] Fine-tuning a custom Voiceitt or LLM model on the corpus (real
+      ML pipeline, far outside this project).
+- [-] Cross-machine / cross-user sharing of the corrections corpus.
+- [-] Embedding-based retrieval for B (substring match until proven
+      insufficient).
+- [-] Feeding corrections back into Voiceitt itself (no API hook
+      exists from where we sit).
 
 ---
 

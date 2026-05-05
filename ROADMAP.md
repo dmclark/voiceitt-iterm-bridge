@@ -223,7 +223,7 @@ in?" and "where in that pane is my caret?" without any JS. Save (4) and
 
 ---
 
-## 1. AI post-processing before paste
+## 1. AI post-processing
 
 ### Inspiration
  VoiceInk's killer feature isn't
@@ -247,36 +247,46 @@ the `send-to-*` script Cmd+A/Cmd+C's it onto the clipboard, then
 AppleScripts (or pastes) it into the destination verbatim. We never look at
 what the user said.
 
-The proposal: insert an **LLM transformation pass** after the copy and
-before the paste, parameterised by **which prompt the user picked**. The
-prompt is not tied to the destination app; the user chooses it directly
-(e.g. "fix dictation noise", "format as bullet list", "translate to
-Spanish", "rewrite as a polite email", "leave it alone"). The same
-selected prompt is used regardless of which `send-to-*` hotkey ultimately
-fires.
+The proposal — building on §0.5's two-pane layout — is to insert an
+**LLM transformation pass between the input field (top, where Voiceitt
+writes) and the output field (bottom, what `send-to-*` actually
+copies)**, parameterised by **which prompt the user picked** (e.g. "fix
+dictation noise", "format as bullet list", "translate to Spanish",
+"rewrite as a polite email", "leave it alone"). The same selected
+prompt is used regardless of which `send-to-*` hotkey ultimately fires;
+the destination is incidental.
+
+The crucial reframing: **the transform belongs to the input→output
+transition, not to the output→clipboard one.** It runs *as soon as
+Voiceitt finishes a phrase*, not when the user hits a hotkey. By the
+time any `send-to-*` fires, the rewritten text is already sitting in
+the output field, ready to be Cmd+A/Cmd+C'd. The hotkey-side bash is
+**unchanged from §0.5** — it already targets the output field — so all
+of §1's work lives in the page.
 
 ```diagram
                   Today                                    Proposed
   ╭──────────────────────────╮             ╭──────────────────────────╮
-  │  Voiceitt textarea       │             │  Voiceitt textarea       │
-  │                          │             │  + prompt picker ▼       │
+  │  Voiceitt textarea       │             │  Input field (top)       │
+  │                          │             │  written by Voiceitt     │
   ╰─────────────┬────────────╯             ╰─────────────┬────────────╯
-                │ Cmd+A / Cmd+C                          │ Cmd+A / Cmd+C
+                │ Cmd+A / Cmd+C                          │ on Voiceitt insert
                 ▼                                        ▼
   ╭──────────────────────────╮             ╭──────────────────────────╮
-  │  macOS clipboard (raw)   │             │  macOS clipboard (raw)   │
-  ╰─────────────┬────────────╯             ╰─────────────┬────────────╯
-                │                                        │
-                │                                        ▼
-                │                          ╭──────────────────────────╮
-                │                          │  LLM transformation pass │
-                │                          │  prompt = picker value   │
+  │  macOS clipboard (raw)   │             │  LLM transformation pass │
+  ╰─────────────┬────────────╯             │  prompt = picker value   │
                 │                          ╰─────────────┬────────────╯
                 │                                        │
                 │                                        ▼
                 │                          ╭──────────────────────────╮
-                │                          │ Clipboard rewritten with │
-                │                          │ transformed text         │
+                │                          │  Output field (bottom)   │
+                │                          │  user can edit / re-run  │
+                │                          ╰─────────────┬────────────╯
+                │                                        │ Cmd+A / Cmd+C
+                │                                        │ (unchanged from §0.5)
+                │                                        ▼
+                │                          ╭──────────────────────────╮
+                │                          │  macOS clipboard         │
                 │                          ╰─────────────┬────────────╯
                 ▼                                        ▼
   ╭──────────────────────────╮             ╭──────────────────────────╮
@@ -284,8 +294,101 @@ fires.
   ╰──────────────────────────╯             ╰──────────────────────────╯
 ```
 
-The destination is incidental — the *prompt* is what determines what
-happens to the text. iTerm is just one possible sink.
+### Trigger mechanics (investigated)
+
+Before designing the picker / config / API call, we needed to know *when*
+the LLM transform should fire. A short DevTools probe in
+`bridge/dictate.html` (now removed) logged every event and `value`-setter
+call on the `#pad` textarea while dictating into it. The findings:
+
+- **Voiceitt writes via `document.execCommand('insertHTML', …)`.** Its
+  content script (`handleRecognisedText.*.js`) literally logs `>>>
+  execCommand insertHTML "…"` for each recognised phrase.
+- **Each utterance = exactly one trusted `input` event**, carrying the
+  full phrase as a single delta (e.g. `Δ=+51` for a 51-char sentence).
+  Voiceitt waits for the user to pause, decides "this phrase is final",
+  then commits the whole thing in one go. There are no per-word partials,
+  no progressive updates, and no IME `compositionstart` /
+  `compositionend` pair.
+- **The `inputType` on the trusted event is empty** (`''`), because
+  that's how Chrome reports `execCommand('insertHTML')`. The preceding
+  synthetic `beforeinput` does carry `inputType: 'insertFromPaste'` but
+  is `isTrusted: false`. So `isTrusted` alone *cannot* distinguish
+  Voiceitt's writes from real keystrokes (both end-of-chain `input`
+  events are trusted). The Voiceitt signature is the *preceding*
+  synthetic `paste` ClipboardEvent (`isTrusted: false`).
+- **No direct `pad.value = …` assignments.** A patched
+  `HTMLTextAreaElement.prototype` value setter never fired, so we don't
+  need to ship that patch in production.
+- **`MutationObserver` is silent** on textarea value changes (as
+  expected — textarea content isn't in the DOM tree). Confirms there's
+  no observer-based fallback to fall back *to*.
+- Voiceitt itself reads `pad.value` via a `getPrevText` helper to
+  maintain its own `previousInsertedText` (that's how it knows whether
+  to prepend a space). Useful context but not something we need to act
+  on.
+
+#### Two triggers, deliberately different rules
+
+Manual edits to the input field (typing, paste from another app, hand
+fixes to a misrecognised word) **must not** auto-fire the LLM. The
+whole point of editing the input field by hand is usually to correct a
+recognition error the model would otherwise paper over (or get wrong
+twice). Forcing an explicit user action for hand edits keeps the user
+in charge of when — and whether — to round-trip a manual change through
+the model.
+
+That gives us two triggers with different mechanics:
+
+**1. Auto-trigger: Voiceitt insertions only.** Latch a flag whenever a
+synthetic (`isTrusted: false`) `paste` event hits the input field, then
+consume it on the very next `input`:
+
+```js
+let voiceittWriting = false;
+inputField.addEventListener('paste', (e) => {
+  if (!e.isTrusted) voiceittWriting = true;       // Voiceitt's signature
+}, true);
+inputField.addEventListener('input', () => {
+  if (!voiceittWriting) return;                    // ignore real typing
+  voiceittWriting = false;
+  scheduleTransform();                              // debounce ~700 ms
+});
+```
+
+The debounce coalesces multi-utterance bursts ("Let me try this again."
+*pause* "I am not sure if it will work.") into a single LLM call. After
+it fires, the result is written into the output field and we record
+`lastInputSentToLLM = inputField.value`.
+
+**2. Manual trigger: a "Re-run through LLM" button** in the header,
+next to the prompt picker and Clear:
+
+```diagram
+╭───────────────────────────────────────────────────────────────────────╮
+│ Voiceitt Scratchpad   [Prompt: Fix dictation ▼]  [↻ Re-run]  [Clear] │
+╰───────────────────────────────────────────────────────────────────────╯
+```
+
+- **Enabled iff** `inputField.value !== lastInputSentToLLM`. So the
+  button lights up the moment the user types into (or otherwise edits)
+  the input field, and goes dark again as soon as any transform
+  completes.
+- **Click semantics:** identical to the auto-trigger's debounced fire —
+  send the current input through the LLM, write into the output field,
+  update `lastInputSentToLLM`.
+- **Keyboard shortcut:** `⌘↵` while the input field is focused is the
+  obvious binding — same gesture as "submit this draft" in most apps.
+
+Editing the **output** field directly is allowed (the field becomes
+editable in §1, per §0.5) and **does not** affect the Re-run button or
+`lastInputSentToLLM`. Once you're hand-tweaking the output, you're
+past the model.
+
+The "Off — paste as dictated" prompt is then implemented trivially:
+the transform function is identity (`output = input`), so the auto and
+manual paths both just mirror. No special-casing the send scripts and
+no special-casing the trigger logic.
 
 ### Why per-prompt, not per-destination
 
@@ -398,7 +501,17 @@ A starter version of this file ships in `bridge/prompts.default.json` and
 `install.sh` copies it into `~/.config/voiceitt-bridge/prompts.json` on
 first run (and never overwrites on subsequent runs, so user edits stick).
 
-Editing is just "open the JSON file in your editor". No UI for v1. The
+The canonical text for the default `fix-dictation` system prompt lives in
+[`prompts/default.md`](./prompts/default.md) — that file is the
+human-editable source of truth, and its contents are what gets inlined as
+the `system` field of the default prompt entry in `bridge/prompts.default.json`
+(and, on first install, in the user's `prompts.json`). Keeping the prose in
+its own Markdown file means it can be edited and reviewed without wading
+through JSON escaping, and the build/install step is responsible for
+folding it back into the JSON.
+
+Editing is just "open the JSON file in your editor" (or, for the default
+prompt, edit `prompts/default.md` and re-seed). No UI for v1. The
 scratchpad reloads its picker on every page open, so the workflow is:
 edit → reload tab → new prompts in the dropdown.
 
@@ -613,6 +726,187 @@ covers ~90% of the value with no command-detection ambiguity. Defer.
 Estimated effort for steps 1–5: **~1 day**, the bulk of which is the
 HTML picker and the sidecar-write plumbing rather than the LLM call
 itself.
+
+---
+
+## 1.5. Session context + learned-corrections memory (extension of §1)
+
+**Priority: after §1 has shaken out in daily use.** §1 sends one phrase
+at a time through the LLM, with no memory of what came before in the
+same dictation session and no memory of how the *user* corrected past
+output. That's the right v1 — small, stateless, debuggable — but it
+leaves two known-quantity wins on the table.
+
+**Status:** exploration / not implemented.
+
+### What this does *not* try to do
+
+Improve Voiceitt's *own* recognition accuracy. We're downstream of
+Voiceitt; by the time text reaches the input field it's already
+committed via `execCommand('insertHTML')`. Voiceitt's recogniser
+doesn't see anything we do here. Everything below is about making the
+**LLM rewrite stage** in §1 produce text that's closer to what the
+user actually meant — which the user experiences as "it stopped
+mishearing me" even though, strictly, the mishearing happened upstream
+and we just got better at silently fixing it.
+
+### Two distinct mechanisms
+
+#### A) Rolling session context (cheap, low-risk)
+
+Pass the last *N* (input, output) pairs from the current session as
+extra context to the LLM call, alongside the current utterance.
+Concretely: prepend a short "Recent dictation in this session, for
+disambiguation only — do not repeat or summarise" block to the user
+message in `voiceitt-transform`.
+
+What this fixes:
+
+- **Homophones decided by topic.** "Right the function" reads as "Write
+  the function" once the model has seen three previous utterances about
+  editing code.
+- **Pronouns and back-references.** "It crashed again" gets to keep
+  "it" instead of being awkwardly expanded, because the model can see
+  the antecedent two utterances back.
+- **Consistent capitalisation of project-specific names.** If
+  `Voiceitt` came out as `voice it` in the first utterance, the user
+  fixes it to `Voiceitt` in the input field, and the next utterance
+  mentions it again, the model now has a precedent to follow rather
+  than re-guessing per phrase.
+- **Tone / register drift.** A long polite-email session stays in the
+  same register instead of each utterance being rewritten in isolation.
+
+What it doesn't fix: anything that requires *cross-session* memory.
+Once the page reloads or the user changes prompts, the rolling window
+resets. That's intentional — it keeps the mechanism small and
+inspectable, and it avoids the model dragging stale context into a new
+topic.
+
+Bound the window aggressively: last **5 utterances** *or* **800 tokens
+of context**, whichever comes first. More than that and (a) latency
+creeps up, (b) the model starts paraphrasing context as if it were
+input, (c) the cost-per-send doubles for marginal gain.
+
+#### B) Learned-corrections memory (high-leverage, more design)
+
+When the user **edits the output field by hand** before sending — or
+edits the input field to fix a recognition error before the LLM runs
+again — *that edit is a labelled training example*. We saw what
+Voiceitt produced, we saw what the LLM produced, and now we see what
+the user actually wanted. Persist the diff and feed it back into
+future transforms.
+
+The naive version, which is also probably the right v1: append every
+non-trivial diff to a JSONL file
+(`~/.config/voiceitt-bridge/corrections.jsonl`) with shape:
+
+```json
+{"ts": "2026-…", "prompt_id": "fix-dictation",
+ "voiceitt_raw": "amp threads",
+ "llm_output": "Amp threads",
+ "user_final": "Amp threads"}
+```
+
+…and at LLM call time, scan the file for entries where
+`voiceitt_raw` contains substrings present in the current utterance,
+and inject the top-K most-recent matches as few-shot examples in the
+system prompt:
+
+```
+The user has previously corrected dictations like:
+  Voiceitt heard: "amp threads"      → User wanted: "Amp threads"
+  Voiceitt heard: "voice it bridge"  → User wanted: "voiceitt-bridge"
+Apply the same conventions where they obviously fit.
+```
+
+What this fixes:
+
+- **Personal jargon, project names, paths, command names.** The
+  highest-frequency category of "Voiceitt is wrong" complaints is
+  proper nouns the recogniser has never been trained on. The user
+  fixes `amp` → `Amp` and `voice it` → `Voiceitt` exactly *once*; from
+  then on the LLM applies the convention silently.
+- **Recurring punctuation preferences.** If the user keeps deleting
+  the Oxford comma the model adds, after a few corrections the
+  few-shot examples nudge the model not to add it.
+- **Acronym vs. spelled-out preference per term.** "VS Code" vs "Visual
+  Studio Code" gets pinned to whichever one the user keeps reverting to.
+
+Why this is more design than (A):
+
+- **Diff harvesting is fiddly.** We need to detect "the user edited the
+  output before sending" without harvesting noise (e.g., the user typed
+  one character, then Cmd+Z'd it). Probably: only record a diff at the
+  moment a `send-to-*` hotkey actually fires, comparing
+  `lastInputSentToLLM` / `lastLLMOutput` to the input and output field
+  contents at fire time.
+- **Substring matching is a weak retriever.** It'll over-trigger on
+  short common words ("the", "a"). Sketch: only index substrings of
+  length ≥ 4 that *changed* between `voiceitt_raw` and `user_final`,
+  not all substrings.
+- **Privacy.** This file *is* a personal dictation log. It should never
+  leave the machine, never get synced via the eventual SQLite/Litestream
+  story without explicit opt-in, and the README must say so loudly.
+- **A "forget this" affordance** is required from day one — a
+  `voiceitt-corrections forget <substring>` CLI, or a button in the
+  scratchpad that pops up the last harvested diff and lets the user
+  delete it. Otherwise the file becomes a graveyard of typos the model
+  thinks are intentional.
+- **Token budget.** Few-shot examples eat into the same context the
+  rolling window in (A) wants. At ~80 tokens per `(raw, final)` pair,
+  budget K = 4 examples ≈ 320 tokens. Combine with (A)'s 800 → ~1.1k
+  tokens of context per call, still well within Haiku's window.
+
+### Where this lives in the pipeline
+
+Both mechanisms are pure additions to `voiceitt-transform`:
+
+```
+input → voiceitt-transform
+          ├─ load active prompt (today)
+          ├─ load rolling session context  (mechanism A)
+          ├─ retrieve relevant corrections (mechanism B)
+          ├─ build system prompt: prompt.system + context + few-shots
+          └─ POST to provider → stdout
+```
+
+Session context is per-tab state, so it lives in `bridge/dictate.html`
+and gets POSTed to the local server alongside each transform request
+(yet another reason §1.4's `POST /active-prompt` endpoint should grow
+into a more general "transform request" handler rather than a sidecar
+file). Corrections memory is persistent state, lives in
+`~/.config/voiceitt-bridge/corrections.jsonl`, and is read directly by
+`voiceitt-transform`.
+
+### Suggested order of attack
+
+1. **Mechanism A first**, sized to "5 utterances or 800 tokens". One
+   afternoon of work; immediate user-visible improvement on the
+   second-and-later utterance of any session. Easy to A/B against §1's
+   stateless baseline by toggling the context block on/off via a
+   `?context=0` query string on the page.
+2. **Live on (A) for a week or two.** It will become obvious whether
+   (B) is worth building, because the user will notice exactly which
+   recurring corrections the rolling-context mechanism *fails* to
+   absorb (anything that doesn't appear in the last 5 utterances).
+3. **Mechanism B**, starting with the dumbest possible retriever
+   (substring match on changed-runs-of-≥-4-chars) and the JSONL store.
+   Add a SQLite migration only when the JSONL file gets large enough
+   that linear scans hurt — which, for a personal dictation log,
+   probably takes months.
+4. **Forget-affordance and privacy README** ship in the same PR as (B).
+   Non-negotiable.
+
+### Out of scope for §1.5
+
+- Fine-tuning a custom Voiceitt or LLM model on the corrections corpus
+  (a real ML pipeline, miles outside this project's scope).
+- Sharing the corrections corpus across machines or users.
+- Embedding-based retrieval for (B) — substring match is fine until
+  it's demonstrably not.
+- Any attempt to feed corrections *back to Voiceitt*. Voiceitt's API
+  doesn't expose a "user lexicon" hook from where we sit; if it ever
+  does, that becomes a separate roadmap item.
 
 ---
 
