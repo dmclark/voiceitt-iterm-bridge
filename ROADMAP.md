@@ -1,20 +1,30 @@
 # Roadmap
 
-## History
+<details open>
+<summary><h2 style="display:inline">History</h2></summary>
+
 
 The idea of a "bridge" originally came out of my work trying to make Voiceitt just another LLM [VoiceInk](https://github.com/Beingpax/VoiceInk) could use as a transcription backend. I've successfully built a [working prototype](https://github.com/dmclark/VoiceInk). The issue is that API consumption is too high to be fiscally viable.
 
 This approach is to provide the same functionality without the API. We are serving a page locally (the extension does not work on local files), essentially replacing [https://web.voiceitt.com/dictate] with a local page so that we can add keyboard shortcuts to send the text to local apps..`
+</details>
 
-## Future work
+
+<details open>
+<summary><h2 style="display:inline">Future work</h2></summary>
+
 
 Three larger pieces of work that the current toolkit doesn't yet cover. All
 are deliberately out of scope for the first version — this doc is the plan for
 "phase two" once the basic iTerm bridge has shaken out in daily use.
+</details>
+
 
 ---
 
-## 0. Adding a new shortcut/target (do this first)
+<details>
+<summary><h2 style="display:inline">0. Adding a new shortcut/target (do this first)</h2></summary>
+
 
 **Status: complete.** Shipped in [PR #1](https://github.com/dmclark/voiceitt-iterm-bridge/pull/1). The
 hand-built `send-to-vscode.sh`, README "Adding a new shortcut" section,
@@ -33,7 +43,9 @@ we want one or two real, hand-built `send-to-*` scripts to exist (and be in
 daily use) before we try to template them. Otherwise the templates encode
 guesses instead of what actually worked.
 
-### Goals
+<details open>
+<summary><h3 style="display:inline">Goals</h3></summary>
+
 
 1. **A user-facing "Add a new shortcut" section in the README** that walks
    through the whole loop in order: pick a target app, find its bundle id,
@@ -52,8 +64,12 @@ guesses instead of what actually worked.
    *minimum* generator: no templates, no strategy picker, just "clone this
    existing script, rename it, point it at this app." The richer generator
    from §2 supersedes it later.
+</details>
 
-### Concrete plan
+
+<details open>
+<summary><h3 style="display:inline">Concrete plan</h3></summary>
+
 
 | Step | Task | Notes |
 | ---- | ---- | ----- |
@@ -62,8 +78,12 @@ guesses instead of what actually worked.
 | 3 | Build `scripts/new-shortcut.sh`: a Raycast Script Command (or plain CLI) that takes `--name`, `--bundle-id`, and `--base` (defaults to `send-to-iterm.sh`), and produces a renamed, header-rewritten copy in `scripts/` plus the Raycast symlink. | One template, one substitution pass. No strategy picker yet. |
 | 4 | Verify the loop end-to-end: run `new-shortcut.sh --name "Notes" --bundle-id com.apple.Notes`, assign a hotkey in Raycast, dictate, send. Note any manual edits still required and feed them back into step 3. | This is what tells us the helper is "good enough." |
 | 5 | Cross-link from §2 ("Per-target scripts via a generator") back to this section, so the generator work picks up where the manual helper leaves off instead of starting from scratch. | Avoids re-litigating the design later. |
+</details>
 
-### Why a small helper now, instead of jumping straight to §2's generator
+
+<details open>
+<summary><h3 style="display:inline">Why a small helper now, instead of jumping straight to §2's generator</h3></summary>
+
 
 - §2's generator wants strategy templates (`applescript` vs.
   `cliclick-paste`), bundle-id auto-detection, optional `&-and-run`
@@ -76,17 +96,27 @@ guesses instead of what actually worked.
   `cliclick`'s Cmd+V land in the right pane? does VS Code need a focus
   click first? does Sticky Keys interfere?) whose answers belong in the
   README *and* in §2's eventual templates.
+</details>
 
-### Out of scope for this item
+
+<details open>
+<summary><h3 style="display:inline">Out of scope for this item</h3></summary>
+
 
 - Multiple strategy templates (deferred to §2).
 - Bundle-id auto-detection from frontmost app (deferred to §2).
 - A picker UI or per-target config file (deferred to §2 / §3).
 - Anything LLM-related (that's §1).
+</details>
+
+</details>
+
 
 ---
 
-## 0.5. Two-pane scratchpad + a little visual polish (prep for §1)
+<details open>
+<summary><h2 style="display:inline">0.5. Two-pane scratchpad + a little visual polish (prep for §1)</h2></summary>
+
 
 **Status: largely complete.** Shipped in [PR #2](https://github.com/dmclark/voiceitt-iterm-bridge/pull/2):
 two-pane layout, mirror-on-input wiring, Atkinson Hyperlegible
@@ -111,7 +141,9 @@ deliberate font + spacing pass costs almost nothing and makes the tool feel
 like something the user *wants* to leave open, which matters because it's
 literally the surface they stare at while dictating.
 
-### Goals
+<details open>
+<summary><h3 style="display:inline">Goals</h3></summary>
+
 
 1. **Two stacked fields in `bridge/dictate.html`:**
    - **Top — "Dictated"**: the existing textarea. Voiceitt writes into this
@@ -132,8 +164,12 @@ literally the surface they stare at while dictating.
    that's a no-op (top and bottom are identical). The change here is just
    updating `send-to-*.sh` to Cmd+A/Cmd+C the *bottom* textarea via a
    `focus()` step so §1 doesn't have to touch bash at all.
+</details>
 
-### Suggested font
+
+<details open>
+<summary><h3 style="display:inline">Suggested font</h3></summary>
+
 
 **Atkinson Hyperlegible** (Braille Institute, OFL-licensed, free on Google
 Fonts). Reasons:
@@ -166,8 +202,12 @@ Other small touches in the same pass, all cheap:
 - `border-radius: 8px` on each pane and a thin `#e6e6e1` divider between
   them.
 - Header strip stays as-is structurally but picks up the new font.
+</details>
 
-### Making the insertion point easier to find
+
+<details open>
+<summary><h3 style="display:inline">Making the insertion point easier to find</h3></summary>
+
 
 The current textarea uses the OS default caret: a 1-px black line that
 blinks 60 times a minute and gets lost the instant you look away. This is
@@ -215,8 +255,12 @@ focused-pane tint** in the same diff. They're collectively ~10 lines of
 CSS and one `:focus` selector, and together they answer "which pane am I
 in?" and "where in that pane is my caret?" without any JS. Save (4) and
 (5) for if those three aren't enough once they're in daily use.
+</details>
 
-### Concrete plan
+
+<details open>
+<summary><h3 style="display:inline">Concrete plan</h3></summary>
+
 
 | Step | Task | Notes |
 | ---- | ---- | ----- |
@@ -225,8 +269,12 @@ in?" and "where in that pane is my caret?" without any JS. Save (4) and
 | 3 | Drop in the Atkinson Hyperlegible `@import` (or vendor a single woff2 into `bridge/` if we'd rather not hit Google Fonts), apply the font + warmer background + rounded panes. | Visual only. |
 | 4 | Update `send-to-iterm.sh` (and `-and-run`) to focus the *bottom* textarea before the Cmd+A/Cmd+C step — the simplest way is to give the bottom field a known `id` (e.g. `pad-out`) and have the script trigger a `focus()` via the existing AppleScript-driving-Chrome path, *or* just have the page itself keep focus on the bottom field whenever its contents change. Pick whichever is less invasive. | Behaviorally a no-op in v0.5 because top and bottom are identical. Sets §1 up to need zero bash changes. |
 | 5 | Smoke-test: dictate into the top pane, confirm the bottom pane mirrors live, confirm `Send to iTerm` still pastes the right text. Confirm Sticky Keys behavior is unchanged. | Same manual test as today. |
+</details>
 
-### Out of scope for this item
+
+<details open>
+<summary><h3 style="display:inline">Out of scope for this item</h3></summary>
+
 
 - Any LLM call (that's §1).
 - Making the bottom pane editable (deferred to §1, where editing it
@@ -234,12 +282,20 @@ in?" and "where in that pane is my caret?" without any JS. Save (4) and
 - A prompt picker (§1).
 - A diff view between the two panes (nice idea, but premature until we
   have an LLM rewriting the bottom one).
+</details>
+
+</details>
+
 
 ---
 
-## 1. AI post-processing
+<details open>
+<summary><h2 style="display:inline">1. AI post-processing</h2></summary>
 
-### Inspiration
+
+<details open>
+<summary><h3 style="display:inline">Inspiration</h3></summary>
+
  VoiceInk's killer feature isn't
 the transcription — it's the **post-transcription enhancement stage**, where
 recognised text is run through an LLM (grammar fixes, formatting, custom
@@ -253,8 +309,12 @@ scratchpad and the destination app, and that's exactly where VoiceInk's
 enhancement stage sits relative to its own active-element write path.
 
 **Status:** exploration / not implemented.
+</details>
 
-### The idea
+
+<details open>
+<summary><h3 style="display:inline">The idea</h3></summary>
+
 
 Today the bridge is mechanical: Voiceitt produces text in the scratchpad,
 the `send-to-*` script Cmd+A/Cmd+C's it onto the clipboard, then
@@ -307,8 +367,12 @@ of §1's work lives in the page.
   │  Destination (verbatim)  │             │  Destination (transformed)│
   ╰──────────────────────────╯             ╰──────────────────────────╯
 ```
+</details>
 
-### Trigger mechanics (investigated)
+
+<details open>
+<summary><h3 style="display:inline">Trigger mechanics (investigated)</h3></summary>
+
 
 Before designing the picker / config / API call, we needed to know *when*
 the LLM transform should fire. A short DevTools probe in
@@ -403,8 +467,12 @@ The "Off — paste as dictated" prompt is then implemented trivially:
 the transform function is identity (`output = input`), so the auto and
 manual paths both just mirror. No special-casing the send scripts and
 no special-casing the trigger logic.
+</details>
 
-### Why per-prompt, not per-destination
+
+<details open>
+<summary><h3 style="display:inline">Why per-prompt, not per-destination</h3></summary>
+
 
 A first pass tied prompts to the destination ("if going to iTerm, clean
 shell noise; if going to Slack, soften tone"). On reflection that's the
@@ -420,8 +488,12 @@ wrong axis:
 - Per-destination defaults can still be layered on later (the picker can
   remember "last prompt used for Send to Slack"), but the primary control
   belongs to the user, not the script.
+</details>
 
-### The prompt picker
+
+<details open>
+<summary><h3 style="display:inline">The prompt picker</h3></summary>
+
 
 A `<select>` in the scratchpad header, next to the Clear button:
 
@@ -449,8 +521,12 @@ Behavior:
 
 A keyboard shortcut (e.g. `⌘1`–`⌘9`) to jump straight to a numbered
 prompt is an obvious follow-up but not needed for v1.
+</details>
 
-### Config file (v1)
+
+<details open>
+<summary><h3 style="display:inline">Config file (v1)</h3></summary>
+
 
 JSON in `~/.config/voiceitt-bridge/prompts.json`. Easy for the scratchpad
 to `fetch('/prompts.json')` from the local server, easy for bash to read
@@ -528,8 +604,12 @@ Editing is just "open the JSON file in your editor" (or, for the default
 prompt, edit `prompts/default.md` and re-seed). No UI for v1. The
 scratchpad reloads its picker on every page open, so the workflow is:
 edit → reload tab → new prompts in the dropdown.
+</details>
 
-### SQLite — when, not if
+
+<details open>
+<summary><h3 style="display:inline">SQLite — when, not if</h3></summary>
+
 
 JSON is the right v1. Reasons we'd graduate to SQLite later:
 
@@ -544,8 +624,12 @@ None of that is on the v1 path. The interface the rest of the system sees
 is "give me the active prompt's `system` text and `provider` info"; that
 contract works the same whether the backing store is JSON or SQLite, so
 the migration is contained.
+</details>
 
-### Where the call goes
+
+<details open>
+<summary><h3 style="display:inline">Where the call goes</h3></summary>
+
 
 The cleanest insertion point in each `send-to-*.sh` is right after the
 existing "copy actually fired" sentinel check and before the AppleScript
@@ -573,8 +657,12 @@ Properties this gives us:
   immediately with the input unchanged.
 - **Existing Sticky-Keys preamble unchanged.** The transformer only
   sees text that already passed the "copy actually fired" check.
+</details>
 
-### What `voiceitt-transform` is
+
+<details open>
+<summary><h3 style="display:inline">What `voiceitt-transform` is</h3></summary>
+
 
 A tiny CLI (~60 lines of bash + `curl` + `jq`). Reads stdin, looks up the
 active prompt in `prompts.json`, posts to the chosen provider, prints
@@ -647,8 +735,12 @@ Provider/API key env conventions:
 Note that **provider/model live in the prompt definition**, not in env
 vars. That's deliberate: a "polite email" prompt may want a smarter model
 than a "fix dictation" prompt, and the user is the one who knows which.
+</details>
 
-### Latency
+
+<details open>
+<summary><h3 style="display:inline">Latency</h3></summary>
+
 
 The bridge today is snappy — hotkey to paste is well under 200ms. An LLM
 round-trip is 400ms–2s depending on provider, model, and network. That's
@@ -675,8 +767,12 @@ Local Ollama is interesting because it removes both the API-key step and
 network unpredictability — at the cost of asking the user to run a model.
 Worth supporting via the `provider: "ollama"` enum but probably not the
 default.
+</details>
 
-### Trigger model
+
+<details open>
+<summary><h3 style="display:inline">Trigger model</h3></summary>
+
 
 Always-on, governed by the picker. The picker is the trigger model — when
 the user wants raw text, they pick `Off`. No per-script variants
@@ -686,8 +782,12 @@ prompt says.
 A "Hey AI"–style command syntax (recognise `"hey AI, …"` as an *ad-hoc*
 prompt overriding the picker) is a tempting follow-up, but the picker
 covers ~90% of the value with no command-detection ambiguity. Defer.
+</details>
 
-### What this does *not* try to do (v1)
+
+<details open>
+<summary><h3 style="display:inline">What this does *not* try to do (v1)</h3></summary>
+
 
 - **No streaming insertion.** Text is buffered in the scratchpad; one
   round trip, one paste.
@@ -701,8 +801,12 @@ covers ~90% of the value with no command-detection ambiguity. Defer.
 - **No history / undo.** The scratchpad keeps the raw text after send, so
   the user can switch the picker to `Off` and re-send to get the verbatim
   version.
+</details>
 
-### Open questions
+
+<details open>
+<summary><h3 style="display:inline">Open questions</h3></summary>
+
 
 1. **Picker → script communication.** Sidecar file
    (`~/.config/voiceitt-bridge/active-prompt`) is proposed. Alternative:
@@ -719,8 +823,12 @@ covers ~90% of the value with no command-detection ambiguity. Defer.
    a fallback for users whose Raycast doesn't inherit shell env.
 4. **`prompts.json` schema versioning.** Add a top-level `"version": 1`
    now so future migrations (especially the SQLite one) have an anchor.
+</details>
 
-### Suggested next steps
+
+<details open>
+<summary><h3 style="display:inline">Suggested next steps</h3></summary>
+
 
 1. Add `bridge/prompts.default.json` with the starter prompts above and a
    top-level `"version": 1`.
@@ -740,10 +848,16 @@ covers ~90% of the value with no command-detection ambiguity. Defer.
 Estimated effort for steps 1–5: **~1 day**, the bulk of which is the
 HTML picker and the sidecar-write plumbing rather than the LLM call
 itself.
+</details>
+
+</details>
+
 
 ---
 
-## 1.5. Session context + learned-corrections memory (extension of §1)
+<details open>
+<summary><h2 style="display:inline">1.5. Session context + learned-corrections memory (extension of §1)</h2></summary>
+
 
 **Priority: after §1 has shaken out in daily use.** §1 sends one phrase
 at a time through the LLM, with no memory of what came before in the
@@ -753,7 +867,9 @@ leaves two known-quantity wins on the table.
 
 **Status:** exploration / not implemented.
 
-### What this does *not* try to do
+<details open>
+<summary><h3 style="display:inline">What this does *not* try to do</h3></summary>
+
 
 Improve Voiceitt's *own* recognition accuracy. We're downstream of
 Voiceitt; by the time text reaches the input field it's already
@@ -763,8 +879,12 @@ doesn't see anything we do here. Everything below is about making the
 user actually meant — which the user experiences as "it stopped
 mishearing me" even though, strictly, the mishearing happened upstream
 and we just got better at silently fixing it.
+</details>
 
-### Two distinct mechanisms
+
+<details open>
+<summary><h3 style="display:inline">Two distinct mechanisms</h3></summary>
+
 
 #### A) Rolling session context (cheap, low-risk)
 
@@ -870,8 +990,12 @@ Why this is more design than (A):
   rolling window in (A) wants. At ~80 tokens per `(raw, final)` pair,
   budget K = 4 examples ≈ 320 tokens. Combine with (A)'s 800 → ~1.1k
   tokens of context per call, still well within Haiku's window.
+</details>
 
-### Where this lives in the pipeline
+
+<details open>
+<summary><h3 style="display:inline">Where this lives in the pipeline</h3></summary>
+
 
 Both mechanisms are pure additions to `voiceitt-transform`:
 
@@ -891,8 +1015,12 @@ into a more general "transform request" handler rather than a sidecar
 file). Corrections memory is persistent state, lives in
 `~/.config/voiceitt-bridge/corrections.jsonl`, and is read directly by
 `voiceitt-transform`.
+</details>
 
-### Suggested order of attack
+
+<details open>
+<summary><h3 style="display:inline">Suggested order of attack</h3></summary>
+
 
 1. **Mechanism A first**, sized to "5 utterances or 800 tokens". One
    afternoon of work; immediate user-visible improvement on the
@@ -910,8 +1038,12 @@ file). Corrections memory is persistent state, lives in
    probably takes months.
 4. **Forget-affordance and privacy README** ship in the same PR as (B).
    Non-negotiable.
+</details>
 
-### Out of scope for §1.5
+
+<details open>
+<summary><h3 style="display:inline">Out of scope for §1.5</h3></summary>
+
 
 - Fine-tuning a custom Voiceitt or LLM model on the corrections corpus
   (a real ML pipeline, miles outside this project's scope).
@@ -921,12 +1053,20 @@ file). Corrections memory is persistent state, lives in
 - Any attempt to feed corrections *back to Voiceitt*. Voiceitt's API
   doesn't expose a "user lexicon" hook from where we sit; if it ever
   does, that becomes a separate roadmap item.
+</details>
+
+</details>
+
 
 ---
 
-## 2. Pluggable target window — paste anywhere, not just iTerm
+<details open>
+<summary><h2 style="display:inline">2. Pluggable target window — paste anywhere, not just iTerm</h2></summary>
 
-### Where we are today
+
+<details open>
+<summary><h3 style="display:inline">Where we are today</h3></summary>
+
 
 `scripts/send-to-iterm.sh` and `scripts/send-to-iterm-and-run.sh` hardcode the
 destination via AppleScript:
@@ -945,8 +1085,12 @@ end tell
 That's reliable and bypasses Sticky Keys entirely (no synthetic Cmd+V), but it
 is iTerm-specific. We want to be able to dictate into Slack, a Chrome textarea
 on a different tab, VS Code, Notes, a different terminal emulator, etc.
+</details>
 
-### Why this isn't just "read frontmost app at send time"
+
+<details open>
+<summary><h3 style="display:inline">Why this isn't just "read frontmost app at send time"</h3></summary>
+
 
 Triggering the Raycast hotkey itself changes focus. By the time our script
 runs, "the app the user wanted to paste into" is no longer frontmost — Raycast
@@ -960,8 +1104,12 @@ automation per (controlling app, controlled app) pair. The first time Raycast
 Accessibility permission for whichever process is invoking it. **Each new
 target app implies at least one fresh permission prompt that the user has to
 answer.** Any design has to make that moment obvious instead of mysterious.
+</details>
 
-### Approach A — Per-target scripts via a generator (recommended)
+
+<details open>
+<summary><h3 style="display:inline">Approach A — Per-target scripts via a generator (recommended)</h3></summary>
+
 
 > **Builds on §0.** The minimal `scripts/new-shortcut.sh` shipped in §0
 > already implements the core of this approach (clone a chosen base script,
@@ -1093,8 +1241,12 @@ materially simpler runtime.
 - **Discoverability** — users can end up with a long list of `send-to-*`
   Raycast commands. That's actually fine; Raycast is built for it. If it ever
   gets unwieldy we can group them under a Raycast extension (see section 3).
+</details>
 
-### Approach B — Single dynamic dispatcher (alternative considered)
+
+<details open>
+<summary><h3 style="display:inline">Approach B — Single dynamic dispatcher (alternative considered)</h3></summary>
+
 
 For completeness, the originally-considered design: store the chosen target
 in `~/.config/voiceitt-bridge/target.json`, add a `Set Voiceitt Target`
@@ -1116,13 +1268,21 @@ Why we're not going with this as the primary plan:
 It's still a valid fallback if the per-script approach produces too many
 commands for someone's taste, and the underlying paste strategies are the
 same — so switching to a dispatcher later would mostly be a UI change.
+</details>
+
+</details>
+
 
 
 ---
 
-## 3. Turning this into a Raycast extension on the Raycast store
+<details open>
+<summary><h2 style="display:inline">3. Turning this into a Raycast extension on the Raycast store</h2></summary>
 
-### Today vs. extension
+
+<details open>
+<summary><h3 style="display:inline">Today vs. extension</h3></summary>
+
 
 Right now we ship **Raycast Script Commands** — plain bash files with
 `# @raycast.*` headers, distributed by `git clone` + `./install.sh`. The
@@ -1131,8 +1291,12 @@ Raycast store does **not** list script-command repos; it only lists proper
 `@raycast/api`, published via Raycast's own publish flow.
 
 A store-quality extension is a real port, not a wrapper.
+</details>
 
-### What the port involves
+
+<details open>
+<summary><h3 style="display:inline">What the port involves</h3></summary>
+
 
 | Area                       | Today (script commands)                   | Extension (TypeScript)                                                                  |
 | -------------------------- | ----------------------------------------- | --------------------------------------------------------------------------------------- |
@@ -1145,8 +1309,12 @@ A store-quality extension is a real port, not a wrapper.
 | HTML scratchpad            | Symlinked into `~/.config/...`            | Bundled in the extension; either copied to `environment.supportPath` on first run, or served by an in-process Node `http.createServer` |
 | AppleScript                | Heredocs in bash                          | `runAppleScript` from `@raycast/utils`                                                  |
 | Distribution               | `git clone` + `install.sh`                | `npm run publish` → Raycast review → store listing                                      |
+</details>
 
-### Sequence of work
+
+<details open>
+<summary><h3 style="display:inline">Sequence of work</h3></summary>
+
 
 1. **Scaffold** with `npm create raycast-extension@latest`. Pick "no view" as
    the default mode for the four commands. (~0.5 day)
@@ -1173,8 +1341,12 @@ A store-quality extension is a real port, not a wrapper.
    `CHANGELOG.md` entry, and a permissions note covering Accessibility +
    "cliclick must be installed". (~0.5 day)
 8. **Submit** via `npm run publish`. Iterate on reviewer feedback.
+</details>
 
-### Estimated total effort
+
+<details open>
+<summary><h3 style="display:inline">Estimated total effort</h3></summary>
+
 
 - **Pure 1:1 port** of today's four commands (still iTerm-only): ~**2–3 days**
   of focused work for someone who has shipped a Raycast extension before;
@@ -1184,8 +1356,12 @@ A store-quality extension is a real port, not a wrapper.
   rounds of small fixes.
 
 So a realistic "ready to publish" budget is **~1 working week**, plus review.
+</details>
 
-### Major risks / unknowns
+
+<details open>
+<summary><h3 style="display:inline">Major risks / unknowns</h3></summary>
+
 
 - **Bundling `cliclick`** — the cleanest UX would be to ship it inside the
   extension, but Raycast's store policies forbid shipping arbitrary binaries.
@@ -1205,11 +1381,19 @@ So a realistic "ready to publish" budget is **~1 working week**, plus review.
 - **Telemetry / privacy** — Raycast extensions cannot exfiltrate clipboard
   contents. Our flow only moves clipboard data through local AppleScript and
   cliclick; that should be fine, but the README must say so explicitly.
+</details>
 
-### Decision point
+
+<details open>
+<summary><h3 style="display:inline">Decision point</h3></summary>
+
 
 A Raycast extension is mostly worthwhile if other Voiceitt users (or
 one-finger typists generally) want this. For a single-user setup, the current
 script-commands flow is materially simpler to maintain. Recommend: do
 section 2 first, live on it for a few weeks, then decide whether to invest
 the week needed for a store extension.
+</details>
+
+</details>
+

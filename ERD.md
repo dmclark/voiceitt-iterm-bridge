@@ -18,12 +18,14 @@ Legend: `[ ]` todo · `[x]` done · `[~]` in progress · `[-]` deferred / droppe
 
 ---
 
-## 0. New-shortcut workflow (current focus)
+<details>
+<summary><h2 style="display:inline">0. New-shortcut workflow (current focus)</h2></summary>
 
 Goal: make adding a `send-to-<app>` shortcut a documented, repeatable
 process, with VS Code as the first hand-built non-iTerm target.
 
-### 0.1 Prototype: hand-built `send-to-vscode.sh`
+<details open>
+<summary><h3 style="display:inline">0.1 Prototype: hand-built `send-to-vscode.sh`</h3></summary>
 
 - [x] Copy `scripts/send-to-iterm.sh` → `scripts/send-to-vscode.sh`.
 - [x] Replace iTerm AppleScript block with `cliclick`-based activate +
@@ -41,7 +43,10 @@ process, with VS Code as the first hand-built non-iTerm target.
       *Dropped: prototype worked first try with no fix-ups needed (Sticky Keys ON
       verified). Findings folded directly into 0.2/0.3 instead of a sidecar file.*
 
-### 0.2 README: "Adding a new shortcut" section
+</details>
+
+<details open>
+<summary><h3 style="display:inline">0.2 README: "Adding a new shortcut" section</h3></summary>
 
 - [x] Add new top-level section to `README.md` titled **Adding a new shortcut**.
 - [x] Document: how to find an app's bundle id
@@ -58,7 +63,10 @@ process, with VS Code as the first hand-built non-iTerm target.
       (`System Settings → Privacy & Security → Accessibility / Automation`).
 - [x] Document: how to verify with Sticky Keys ON.
 
-### 0.3 Helper: `scripts/new-shortcut.sh`
+</details>
+
+<details open>
+<summary><h3 style="display:inline">0.3 Helper: `scripts/new-shortcut.sh`</h3></summary>
 
 - [x] Create `scripts/new-shortcut.sh`, executable.
 - [x] Accepts `--name "VS Code"`, `--bundle-id com.microsoft.VSCode`,
@@ -84,21 +92,30 @@ process, with VS Code as the first hand-built non-iTerm target.
       demand. End-to-end paste-into-Notes verification is the user's call —
       not blocking 0.3.*
 
-### 0.4 Cross-links
+</details>
+
+<details open>
+<summary><h3 style="display:inline">0.4 Cross-links</h3></summary>
 
 - [x] Add a back-reference from ROADMAP §2 ("Per-target scripts via a
       generator") to ROADMAP §0, noting the §0 helper is the seed of §2's
       richer generator.
 
+</details>
+
+</details>
+
 ---
 
-## 0.5 Two-pane scratchpad + visual polish (prep for §1)
+<details open>
+<summary><h2 style="display:inline">0.5 Two-pane scratchpad + visual polish (prep for §1)</h2></summary>
 
 Goal: split `bridge/dictate.html` into a "Dictated" + "To be pasted" pair,
 apply a light typography pass, and make the caret findable — all before
 any LLM work in §1.
 
-### 0.5.1 Two-pane layout
+<details open>
+<summary><h3 style="display:inline">0.5.1 Two-pane layout</h3></summary>
 
 - [x] Refactor `bridge/dictate.html` into two stacked textareas in a flex
       column.
@@ -115,7 +132,10 @@ any LLM work in §1.
 - [x] Bottom pane shows a muted placeholder explaining it'll mirror the
       top until §1 lands.
 
-### 0.5.2 Send-script retargeting
+</details>
+
+<details open>
+<summary><h3 style="display:inline">0.5.2 Send-script retargeting</h3></summary>
 
 - [ ] Update `send-to-iterm.sh` and `send-to-iterm-and-run.sh` to
       Cmd+A/Cmd+C the **bottom** textarea (`pad-out`) instead of `pad`.
@@ -124,7 +144,10 @@ any LLM work in §1.
 - [ ] Smoke-test with Sticky Keys ON: dictate → bottom pane mirrors →
       hotkey pastes the right text into iTerm and VS Code.
 
-### 0.5.3 Typography pass
+</details>
+
+<details open>
+<summary><h3 style="display:inline">0.5.3 Typography pass</h3></summary>
 
 - [x] Add Atkinson Hyperlegible (Google Fonts `@import` *or* a vendored
       woff2 in `bridge/`) — pick one, document the choice in `bridge/`.
@@ -143,7 +166,10 @@ any LLM work in §1.
       *Inherits via the `body` font-family chain; header background also
       shifted to `#f5f4ef` to harmonise with the new warmer page background.*
 
-### 0.5.4 Caret visibility (starter combo)
+</details>
+
+<details open>
+<summary><h3 style="display:inline">0.5.4 Caret visibility (starter combo)</h3></summary>
 
 - [x] `caret-color: #ff3b30` on both textareas.
       *Applied to the `textarea` selector so it covers `pad` today and
@@ -168,16 +194,24 @@ any LLM work in §1.
       `selectionchange`, resize, and across the 80 ms focus font-size
       transition via a short rAF loop.*
 
-### 0.5.5 Out of scope (explicit)
+</details>
+
+<details open>
+<summary><h3 style="display:inline">0.5.5 Out of scope (explicit)</h3></summary>
 
 - [-] LLM call (belongs to §1).
 - [-] Bottom pane editable (belongs to §1, where editing it means something).
 - [-] Prompt picker (belongs to §1).
 - [-] Diff view between panes (premature until §1 rewrites the bottom one).
 
+</details>
+
+</details>
+
 ---
 
-## 1. AI post-processing before paste
+<details open>
+<summary><h2 style="display:inline">1. AI post-processing before paste</h2></summary>
 
 Goal: insert a user-selectable LLM transformation **between the input
 field (top) and the output field (bottom)** of the §0.5 two-pane
@@ -185,7 +219,8 @@ scratchpad. The transform fires when Voiceitt finishes a phrase, not at
 hotkey time — so the existing `send-to-*.sh` bash is unchanged from
 §0.5; all of §1's net-new logic lives in the page + a small CLI.
 
-### 1.1 Prompt config
+<details open>
+<summary><h3 style="display:inline">1.1 Prompt config</h3></summary>
 
 - [ ] Author `prompts/default.md` as the human-editable source of truth
       for the default `fix-dictation` system prompt (Markdown so it
@@ -205,7 +240,10 @@ hotkey time — so the existing `send-to-*.sh` bash is unchanged from
       `default: "fix-dictation"`. Recommend `off`; record the call here
       when made.
 
-### 1.2 Scratchpad picker UI
+</details>
+
+<details open>
+<summary><h3 style="display:inline">1.2 Scratchpad picker UI</h3></summary>
 
 - [ ] Add `<select id="prompt-picker">` to `bridge/dictate.html` header,
       between the title and the Clear button.
@@ -221,7 +259,10 @@ hotkey time — so the existing `send-to-*.sh` bash is unchanged from
 - [ ] Bind `⌘↵` (while the input field is focused) to the same action as
       the Re-run button.
 
-### 1.3 Trigger logic in `bridge/dictate.html`
+</details>
+
+<details open>
+<summary><h3 style="display:inline">1.3 Trigger logic in `bridge/dictate.html`</h3></summary>
 
 - [ ] **Auto-trigger:** latch a `voiceittWriting` flag on any
       synthetic (`isTrusted: false`) `paste` event on the input field
@@ -240,7 +281,10 @@ hotkey time — so the existing `send-to-*.sh` bash is unchanged from
 - [ ] When the active prompt is `off`, the transform function is
       identity (`output = input`); no special-casing needed elsewhere.
 
-### 1.4 Local server endpoint for picker → CLI handoff
+</details>
+
+<details open>
+<summary><h3 style="display:inline">1.4 Local server endpoint for picker → CLI handoff</h3></summary>
 
 - [ ] Replace `python3 -m http.server` (or extend it) with a tiny
       handler that serves the `bridge/` dir **and** accepts
@@ -249,7 +293,10 @@ hotkey time — so the existing `send-to-*.sh` bash is unchanged from
 - [ ] Document the chosen impl (Python `http.server` subclass, Node
       one-liner, etc.) in `bridge/`.
 
-### 1.5 Transformer CLI
+</details>
+
+<details open>
+<summary><h3 style="display:inline">1.5 Transformer CLI</h3></summary>
 
 - [ ] Create `scripts/voiceitt-transform` (bash + curl + jq).
 - [ ] Reads stdin; reads active prompt id from
@@ -272,7 +319,10 @@ hotkey time — so the existing `send-to-*.sh` bash is unchanged from
       (sourced by `send-to-*.sh` for users whose Raycast doesn't inherit
       shell env).
 
-### 1.6 Page-side integration (the LLM POST)
+</details>
+
+<details open>
+<summary><h3 style="display:inline">1.6 Page-side integration (the LLM POST)</h3></summary>
 
 - [ ] On auto/manual trigger, the page POSTs the input text +
       active-prompt id to a local endpoint that shells out to
@@ -282,7 +332,10 @@ hotkey time — so the existing `send-to-*.sh` bash is unchanged from
 - [ ] Whichever path wins, send-scripts stay unchanged from §0.5
       (already targeting the bottom pane).
 
-### 1.7 README
+</details>
+
+<details open>
+<summary><h3 style="display:inline">1.7 README</h3></summary>
 
 - [ ] New top-level section: **Optional: AI transformation before paste**.
 - [ ] Picker screenshot.
@@ -291,7 +344,10 @@ hotkey time — so the existing `send-to-*.sh` bash is unchanged from
 - [ ] Note that editing `prompts/default.md` + reseeding is how the
       `fix-dictation` prompt is changed.
 
-### 1.8 Out of scope for v1 (explicit)
+</details>
+
+<details open>
+<summary><h3 style="display:inline">1.8 Out of scope for v1 (explicit)</h3></summary>
 
 - [-] Streaming insertion (one round-trip, one paste).
 - [-] Screen / clipboard context capture beyond the dictated text.
@@ -303,15 +359,21 @@ hotkey time — so the existing `send-to-*.sh` bash is unchanged from
       migration is contained because the rest of the system only sees
       "give me the active prompt's `system` + `provider`").
 
+</details>
+
+</details>
+
 ---
 
-## 1.5 Session context + learned-corrections memory (extension of §1)
+<details open>
+<summary><h2 style="display:inline">1.5 Session context + learned-corrections memory (extension of §1)</h2></summary>
 
 Goal: lift the LLM rewrite quality (§1) above what stateless,
 single-utterance prompting can do — *without* changing Voiceitt's own
 recogniser, which we don't control. Two mechanisms, A then B.
 
-### 1.5.1 Mechanism A — rolling session context
+<details open>
+<summary><h3 style="display:inline">1.5.1 Mechanism A — rolling session context</h3></summary>
 
 - [ ] In `bridge/dictate.html`, keep an in-memory ring buffer of the last
       5 `(input, output)` pairs for the current session (cleared on
@@ -329,7 +391,10 @@ recogniser, which we don't control. Two mechanisms, A then B.
       `Voiceitt`), correct it once in the input field, confirm the next
       utterance keeps the corrected capitalisation without further help.
 
-### 1.5.2 Mechanism B — learned-corrections memory
+</details>
+
+<details open>
+<summary><h3 style="display:inline">1.5.2 Mechanism B — learned-corrections memory</h3></summary>
 
 - [ ] Define `~/.config/voiceitt-bridge/corrections.jsonl` schema:
       `{ts, prompt_id, voiceitt_raw, llm_output, user_final}` per line.
@@ -351,7 +416,10 @@ recogniser, which we don't control. Two mechanisms, A then B.
       personal dictation log, never leaves the machine, and is excluded
       from any future sync story without explicit opt-in.
 
-### 1.5.3 Sequencing
+</details>
+
+<details open>
+<summary><h3 style="display:inline">1.5.3 Sequencing</h3></summary>
 
 - [ ] Ship 1.5.1 (Mechanism A) on its own; live on it for ≥ 1 week.
 - [ ] Re-evaluate whether 1.5.2 is worth building based on what A
@@ -360,7 +428,10 @@ recogniser, which we don't control. Two mechanisms, A then B.
 - [ ] Only then ship 1.5.2 + the forget-affordance + privacy README in
       one PR.
 
-### 1.5.4 Out of scope (explicit)
+</details>
+
+<details open>
+<summary><h3 style="display:inline">1.5.4 Out of scope (explicit)</h3></summary>
 
 - [-] Fine-tuning a custom Voiceitt or LLM model on the corpus (real
       ML pipeline, far outside this project).
@@ -370,28 +441,40 @@ recogniser, which we don't control. Two mechanisms, A then B.
 - [-] Feeding corrections back into Voiceitt itself (no API hook
       exists from where we sit).
 
+</details>
+
+</details>
+
 ---
 
-## 2. Per-target scripts via a generator
+<details open>
+<summary><h2 style="display:inline">2. Per-target scripts via a generator</h2></summary>
 
 Goal: graduate §0's minimal `new-shortcut.sh` into a real generator
 with strategy templates and bundle-id auto-detection.
 
-### 2.1 Refactor
+<details open>
+<summary><h3 style="display:inline">2.1 Refactor</h3></summary>
 
 - [ ] Extract shared "copy from focused app via cliclick + sentinel"
       preamble into `scripts/lib/copy-focused.sh`.
 - [ ] Update existing `send-to-iterm*.sh` and the §0
       `send-to-vscode.sh` to source the lib.
 
-### 2.2 Templates
+</details>
+
+<details open>
+<summary><h3 style="display:inline">2.2 Templates</h3></summary>
 
 - [ ] `templates/send-applescript.sh.tmpl` for AppleScript-capable apps.
 - [ ] `templates/send-cliclick-paste.sh.tmpl` for everything else.
 - [ ] `templates/send-cliclick-paste-run.sh.tmpl` for the `& Run` variant.
 - [ ] Hand-curated AppleScript bodies for iTerm, Terminal, Chrome, Safari.
 
-### 2.3 Generator: `scripts/new-target.sh`
+</details>
+
+<details open>
+<summary><h3 style="display:inline">2.3 Generator: `scripts/new-target.sh`</h3></summary>
 
 - [ ] Raycast Script Command with `# @raycast.argument` for: target name,
       bundle id, strategy, submit-on-send, icon.
@@ -404,24 +487,36 @@ with strategy templates and bundle-id auto-detection.
 - [ ] Notification: created, open Raycast, assign hotkey, expect
       permission prompt.
 
-### 2.4 Docs & risks
+</details>
+
+<details open>
+<summary><h3 style="display:inline">2.4 Docs & risks</h3></summary>
 
 - [ ] README: "Adding a new target" section (supersedes §0.2's manual flow).
 - [ ] Document Secure Input mode bail-out.
 - [ ] Document focus-into-text-field caveat for `cliclick-paste` strategy.
 
+</details>
+
+</details>
+
 ---
 
-## 3. Raycast Store extension
+<details open>
+<summary><h2 style="display:inline">3. Raycast Store extension</h2></summary>
 
 Goal: ship a TypeScript Raycast extension to the store.
 
-### 3.1 Scaffold
+<details open>
+<summary><h3 style="display:inline">3.1 Scaffold</h3></summary>
 
 - [ ] `npm create raycast-extension@latest`; pick "no view" default.
 - [ ] Declare four commands in `package.json`.
 
-### 3.2 Command ports
+</details>
+
+<details open>
+<summary><h3 style="display:inline">3.2 Command ports</h3></summary>
 
 - [ ] Port `open-voiceitt`: spawn local HTTP server, write scratchpad to
       `environment.supportPath`, open Chrome via `runAppleScript`,
@@ -431,11 +526,17 @@ Goal: ship a TypeScript Raycast extension to the store.
 - [ ] Port `back-to-voiceitt` (straight `runAppleScript`).
 - [ ] Port multi-target generator from §2 as a TS dispatcher + `<List>` UI.
 
-### 3.3 Preferences
+</details>
+
+<details open>
+<summary><h3 style="display:inline">3.3 Preferences</h3></summary>
 
 - [ ] Expose port, scratchpad title, `cliclick` path as Raycast preferences.
 
-### 3.4 Polish
+</details>
+
+<details open>
+<summary><h3 style="display:inline">3.4 Polish</h3></summary>
 
 - [ ] 512×512 extension icon.
 - [ ] At least one screenshot per command.
@@ -443,18 +544,28 @@ Goal: ship a TypeScript Raycast extension to the store.
 - [ ] `CHANGELOG.md` entry.
 - [ ] Permissions note (Accessibility + `cliclick` install).
 
-### 3.5 Submission
+</details>
+
+<details open>
+<summary><h3 style="display:inline">3.5 Submission</h3></summary>
 
 - [ ] `npm run publish`.
 - [ ] Address reviewer feedback rounds.
 - [ ] Listed on Raycast Store.
 
+</details>
+
+</details>
+
 ---
 
-## Cross-cutting / housekeeping
+<details open>
+<summary><h2 style="display:inline">Cross-cutting / housekeeping</h2></summary>
 
 - [ ] Keep this ERD in sync with ROADMAP.md whenever a roadmap section
       gains/loses scope.
 - [ ] On every shortcut PR, update the relevant 0.x / 2.x checkbox.
 - [ ] Periodic sweep: convert any `[~]` items older than two weeks back
       to `[ ]` with a note about what blocked them.
+
+</details>
