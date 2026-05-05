@@ -17,7 +17,27 @@ There is no build system, no package manager, no test suite. The "code" is bash 
 - `prompts/` — reusable prompt text for the user's dictation workflow.
 - `install.sh` — symlinks scripts into `~/.config/raycast/scripts/` and the HTML into `~/.config/voiceitt-bridge/`. Idempotent; re-run after adding a script.
 - `README.md` — user-facing setup and usage.
-- `notes/` — design notes (`ROADMAP.md`, `ERD.md`, `amp-cost-analysis.md`, `notes-chrome-extension.md`); read before changing related behavior.
+- `notes/` — design notes (`ROADMAP.md`, `ERD.md`, `PARKING-LOT.md`, `amp-cost-analysis.md`, `notes-chrome-extension.md`); read before changing related behavior.
+
+## Parking lot
+
+`notes/PARKING-LOT.md` holds unstructured ideas that are **not commitments**
+and **not TODOs**. Never treat a parking-lot entry as work to implement.
+
+When the user says "add to parking lot <idea>" (or similar):
+
+1. Append a single line to the appropriate section of `notes/PARKING-LOT.md`
+   in the format `- YYYY-MM-DD  <idea>`. Use today's date. Do not flesh the
+   idea out — keep it to one line. Pick the closest existing section
+   (`Targets`, `Scratchpad`, `Tooling / workflow`, `Misc`); add a new
+   section only if none fits.
+2. Commit it as its **own** commit with message
+   `chore(parking-lot): <short summary>`. Never bundle the parking-lot edit
+   into an in-progress feature commit.
+3. If the user is mid-task on another branch, stay on that branch — the
+   parking-lot commit rides along and lands in `main` when the PR merges.
+   Do not switch branches or stash unless the user asks.
+4. Do not push unless the user explicitly asks.
 
 ## Conventions for new `send-to-*.sh` scripts
 
