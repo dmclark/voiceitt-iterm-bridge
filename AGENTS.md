@@ -39,6 +39,22 @@ When the user says "add to parking lot <idea>" (or similar):
    Do not switch branches or stash unless the user asks.
 4. Do not push unless the user explicitly asks.
 
+## Branches and commits
+
+- Work happens on topic branches; `main` is always releasable.
+- Branch prefix matches commit type:
+  - `feat/<slug>` — new functionality
+  - `fix/<slug>` — bug fix
+  - `chore/<slug>` — tooling, deps, docs-only refactors
+  - `docs/<slug>` — substantive documentation work
+  - `explore/<slug>` — spike / throwaway investigation
+- Use `feat/`, never `feature/`. Use `fix/`, never `bugfix/` or `hotfix/`.
+- Commit messages follow Conventional Commits: `type(scope): summary`
+  (e.g. `feat(scripts): add send-to-slack`, `chore(parking-lot): …`).
+- One logical change per commit. Don't bundle unrelated edits — split them
+  into separate commits even on the same branch.
+- Never push without explicit user instruction.
+
 ## Conventions for new `send-to-*.sh` scripts
 
 When adding a new target app, copy the closest existing script and edit only what's necessary. Two strategies:
