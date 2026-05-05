@@ -35,9 +35,14 @@ if [ "$ALREADY_OPEN" = "true" ]; then
 fi
 
 # 2) Make sure our local HTTP server is running on $PAD_PORT.
+#    Uses bridge/serve.py (a small http.server subclass) so the page can
+#    POST /transform to invoke voiceitt-transform server-side. See
+#    ERD §1.4 / §1.6 and bridge/serve.py for why we don't use plain
+#    `python3 -m http.server` anymore.
 if ! lsof -iTCP:"$PAD_PORT" -sTCP:LISTEN >/dev/null 2>&1; then
   # Start in the background, detached, surviving this script's exit.
-  nohup python3 -m http.server "$PAD_PORT" --bind 127.0.0.1 --directory "$PAD_DIR" \
+  nohup env VOICEITT_BRIDGE_PORT="$PAD_PORT" VOICEITT_BRIDGE_DIR="$PAD_DIR" \
+    python3 "$PAD_DIR/serve.py" \
     >>"$LOG_FILE" 2>&1 </dev/null &
   disown 2>/dev/null || true
 

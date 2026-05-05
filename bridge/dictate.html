@@ -87,11 +87,22 @@
     }
     button { background: #e6e6e1; color: #1a1a1a; border: 1px solid #cfcfc8; padding: 4px 10px; border-radius: 4px; font-size: 12px; font-family: inherit; cursor: pointer; }
     button:hover { background: #d8d8d2; }
+    /*
+     * Tiny status indicator (ERD §1.3). Shows "idle" / "transforming…" /
+     * "ok" / "fail-open: raw" so the auto-trigger is observable without
+     * opening DevTools. Colours match the caret palette so it doesn't
+     * shout when everything is fine.
+     */
+    #status { font-size: 11px; color: #888; min-width: 10ch; text-align: right; }
+    #status.busy { color: #b07d00; }
+    #status.ok   { color: #2e7d32; }
+    #status.warn { color: #ff3b30; }
   </style>
 </head>
 <body>
   <header>
     <span>Voiceitt Scratchpad — dictate here, then trigger your Raycast hotkey.</span>
+    <span id="status" aria-live="polite" title="LLM transform status">idle</span>
     <button id="clear" title="Clear (⌘K)">Clear</button>
   </header>
   <div class="pane">
@@ -100,8 +111,8 @@
   </div>
   <div class="pane">
     <div class="pane-label">To be pasted</div>
-    <textarea id="pad-out" readonly
-      placeholder="Will mirror the dictated text until AI post-processing is enabled (§1)."></textarea>
+    <textarea id="pad-out"
+      placeholder="LLM-cleaned text appears here after each dictated phrase. Edit before sending if needed; ⌘↵ in the top pane re-runs the transform."></textarea>
   </div>
   <div id="faux-caret" aria-hidden="true"></div>
 
@@ -109,28 +120,130 @@
     const pad = document.getElementById('pad');
     const padOut = document.getElementById('pad-out');
     const clearBtn = document.getElementById('clear');
+    const statusEl = document.getElementById('status');
     const fauxCaret = document.getElementById('faux-caret');
 
-    // Always keep focus in the top (Dictated) textarea so Cmd+A / Cmd+C
-    // target it, and so the bottom (read-only) pane can never steal
-    // focus on a stray click.
+    // Default focus into the top (Dictated) pane so Voiceitt has somewhere
+    // to write. We do NOT force focus back to it on every click anymore
+    // (ERD §1.3 makes the bottom pane editable, so users need to be able
+    // to click into it). Window-level focus still re-snaps to pad so a
+    // freshly-restored Chrome window is dictation-ready.
     function refocus() { pad.focus(); }
     window.addEventListener('focus', refocus);
-    document.addEventListener('click', (e) => { if (e.target !== clearBtn) refocus(); });
     setTimeout(refocus, 0);
 
-    // v0.5 placeholder for §1's LLM transform: mirror the top pane into
-    // the bottom one verbatim. §1 swaps this for a transform call.
-    pad.addEventListener('input', () => { padOut.value = pad.value; });
-
-    function clearAll() { pad.value = ''; padOut.value = ''; refocus(); updateFauxCaret(); }
+    function clearAll() {
+      pad.value = ''; padOut.value = '';
+      lastInputSentToLLM = '';
+      setStatus('idle');
+      refocus(); updateFauxCaret();
+    }
     clearBtn.addEventListener('click', clearAll);
 
-    // Cmd+K to clear
+    // Cmd+K to clear (works regardless of focused pane).
     window.addEventListener('keydown', (e) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
         e.preventDefault();
         clearAll();
+      }
+    });
+
+    /*
+     * ===========================================================
+     *  §1.3 — auto-trigger + manual ⌘↵ trigger
+     * ===========================================================
+     *
+     * Auto-trigger: ROADMAP §1 "Trigger mechanics" established that
+     * Voiceitt commits each utterance via `execCommand('insertHTML')`,
+     * which fires:
+     *   1. a synthetic (`isTrusted: false`) `paste` ClipboardEvent
+     *   2. a trusted `input` event with `inputType: ''`
+     * Real keystrokes / user paste don't have step 1. So we latch
+     * `voiceittWriting = true` on the untrusted paste and consume it on
+     * the very next `input` event. Manual edits to the input field do
+     * not fire the auto-trigger — that's intentional (the whole point
+     * of editing by hand is usually to fix a mis-recognition the model
+     * would otherwise paper over). To re-run after a manual edit, use
+     * the manual trigger (⌘↵).
+     *
+     * Manual trigger: ⌘↵ while the input pane is focused. Force-fires
+     * the transform even if `inputField.value === lastInputSentToLLM`
+     * (otherwise re-runs after manual tweaks would be no-ops).
+     *
+     * `lastInputSentToLLM` lets a future "↻ Re-run" button (ERD §1.2)
+     * gate its disabled state without further plumbing.
+     */
+    const TRANSFORM_DEBOUNCE_MS = 700;
+
+    let voiceittWriting = false;
+    let lastInputSentToLLM = '';
+    let debounceTimer = null;
+    let inFlight = null;
+
+    function setStatus(label, kind) {
+      statusEl.textContent = label;
+      statusEl.className = kind || '';
+    }
+
+    pad.addEventListener('paste', (e) => {
+      if (!e.isTrusted) voiceittWriting = true;
+    }, true);
+
+    pad.addEventListener('input', () => {
+      if (!voiceittWriting) return;
+      voiceittWriting = false;
+      scheduleTransform();
+    });
+
+    function scheduleTransform() {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(runTransform, TRANSFORM_DEBOUNCE_MS);
+    }
+
+    async function runTransform() {
+      const text = pad.value;
+      if (!text) { setStatus('idle'); return; }
+      if (text === lastInputSentToLLM) return;
+      lastInputSentToLLM = text;
+
+      // Cancel any in-flight call so the freshest dictation always wins.
+      if (inFlight) inFlight.abort();
+      inFlight = new AbortController();
+
+      setStatus('transforming…', 'busy');
+      try {
+        const r = await fetch('/transform', {
+          method: 'POST',
+          headers: {'content-type': 'application/json'},
+          body: JSON.stringify({text}),
+          signal: inFlight.signal,
+        });
+        if (!r.ok) throw new Error('HTTP ' + r.status + ' ' + (await r.text()).slice(0, 200));
+        padOut.value = await r.text();
+        setStatus('ok', 'ok');
+      } catch (err) {
+        if (err.name === 'AbortError') return;
+        // Fail-open: never block the user. Drop the raw text into the
+        // output pane so the existing send-script flow still works,
+        // and surface that we did so.
+        console.warn('transform failed, falling back to raw text', err);
+        padOut.value = text;
+        setStatus('fail-open: raw', 'warn');
+      } finally {
+        inFlight = null;
+        updateFauxCaret();
+      }
+    }
+
+    // Manual trigger: ⌘↵ on the input field re-runs the transform,
+    // bypassing the lastInputSentToLLM gate (so post-edit re-runs
+    // actually go through).
+    pad.addEventListener('keydown', (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+        e.preventDefault();
+        clearTimeout(debounceTimer);
+        lastInputSentToLLM = '';
+        runTransform();
       }
     });
 
@@ -212,24 +325,38 @@
       fauxCaret.style.animation = '';
     }
 
-    // Recompute on anything that can move the caret.
+    // Recompute on anything that can move the caret. Both panes are
+    // editable post-§1.3, so the faux caret tracks whichever one has
+    // focus (updateFauxCaret already keys off document.activeElement).
     ['input', 'click', 'keyup', 'focus', 'scroll', 'select'].forEach(evt => {
       pad.addEventListener(evt, updateFauxCaret);
+      padOut.addEventListener(evt, updateFauxCaret);
     });
-    pad.addEventListener('blur', () => { fauxCaret.style.display = 'none'; });
+    function maybeHideFauxCaret() {
+      // Defer so a focus change pad↔padOut doesn't briefly hide it.
+      setTimeout(() => {
+        if (!(document.activeElement instanceof HTMLTextAreaElement)) {
+          fauxCaret.style.display = 'none';
+        }
+      }, 0);
+    }
+    pad.addEventListener('blur', maybeHideFauxCaret);
+    padOut.addEventListener('blur', maybeHideFauxCaret);
     document.addEventListener('selectionchange', updateFauxCaret);
     window.addEventListener('resize', updateFauxCaret);
 
     // Track the focus font-size transition so the caret stays glued to
     // the cursor across the 80 ms 22→26 px ease.
-    pad.addEventListener('transitionrun', () => {
+    function trackTransition() {
       const start = performance.now();
       const tick = (now) => {
         updateFauxCaret();
         if (now - start < 140) requestAnimationFrame(tick);
       };
       requestAnimationFrame(tick);
-    });
+    }
+    pad.addEventListener('transitionrun', trackTransition);
+    padOut.addEventListener('transitionrun', trackTransition);
 
     requestAnimationFrame(updateFauxCaret);
   </script>
