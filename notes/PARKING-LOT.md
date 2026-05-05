@@ -1,5 +1,9 @@
 # Parking lot
 
+**[📖 README](../README.md)** · **[🗺 Roadmap](./ROADMAP.md)** · **[🧩 ERD](./ERD.md)** · **[🅿️ Parking lot](./PARKING-LOT.md)**
+
+---
+
 Unstructured ideas that are **not commitments**. Resist the urge to flesh
 them out — the point is to dump and forget. When something graduates to
 real work, move it into [ROADMAP.md](./ROADMAP.md) with a section number

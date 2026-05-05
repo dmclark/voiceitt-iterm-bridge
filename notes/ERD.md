@@ -1,5 +1,9 @@
 # ERD — Engineering Requirements & Delivery Checklist
 
+**[📖 README](../README.md)** · **[🗺 Roadmap](./ROADMAP.md)** · **[🧩 ERD](./ERD.md)** · **[🅿️ Parking lot](./PARKING-LOT.md)**
+
+---
+
 Companion to [ROADMAP.md](./ROADMAP.md). The roadmap is the *thinking*
 (why, design, tradeoffs); this doc is the *doing* — a flat checklist of
 concrete deliverables we can tick off as work lands.
