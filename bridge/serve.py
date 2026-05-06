@@ -34,6 +34,7 @@ import json
 import os
 import subprocess
 import sys
+from datetime import datetime
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 
 
@@ -57,13 +58,20 @@ def _snip(s, n=120):
     return s[: n - 1] + "…"
 
 
+def _ts():
+    """Local timestamp prefix for log lines (ISO-ish, second precision)."""
+    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+
 class Handler(SimpleHTTPRequestHandler):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, directory=SERVE_DIR, **kwargs)
 
     # Trim the default per-request access log to one line on stderr.
     def log_message(self, fmt, *args):
-        sys.stderr.write("%s - %s\n" % (self.address_string(), fmt % args))
+        sys.stderr.write(
+            "%s %s - %s\n" % (_ts(), self.address_string(), fmt % args)
+        )
 
     def do_POST(self):
         if self.path != "/transform":
@@ -110,8 +118,8 @@ class Handler(SimpleHTTPRequestHandler):
             # Surface stderr in the server log; the page treats any non-2xx
             # as "fail open with raw text" so the user is never blocked.
             sys.stderr.write(
-                "voiceitt-transform exit %d on input %r:\n%s\n"
-                % (result.returncode, _snip(text), (result.stderr or "").rstrip())
+                "%s voiceitt-transform exit %d on input %r:\n%s\n"
+                % (_ts(), result.returncode, _snip(text), (result.stderr or "").rstrip())
             )
             self.send_error(
                 502,
@@ -122,8 +130,8 @@ class Handler(SimpleHTTPRequestHandler):
         # Debug visibility — log each round-trip's input/output snippet to
         # server.log so behaviour is inspectable without DevTools.
         sys.stderr.write(
-            "transform: in=%r out=%r%s\n"
-            % (_snip(text), _snip(result.stdout),
+            "%s transform: in=%r out=%r%s\n"
+            % (_ts(), _snip(text), _snip(result.stdout),
                " (unchanged)" if result.stdout == text else "")
         )
         self._send_text(200, result.stdout)
@@ -140,9 +148,9 @@ class Handler(SimpleHTTPRequestHandler):
 def main():
     server = ThreadingHTTPServer(("127.0.0.1", PORT), Handler)
     sys.stderr.write(
-        "voiceitt-bridge: serving %s on http://127.0.0.1:%d\n"
-        "voiceitt-bridge: transform CLI = %s\n"
-        % (SERVE_DIR, PORT, TRANSFORM_CMD)
+        "%s voiceitt-bridge: serving %s on http://127.0.0.1:%d\n"
+        "%s voiceitt-bridge: transform CLI = %s\n"
+        % (_ts(), SERVE_DIR, PORT, _ts(), TRANSFORM_CMD)
     )
     server.serve_forever()
 
