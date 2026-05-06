@@ -330,6 +330,18 @@ the existing send hotkeys still pick up the raw text from `pad`.
       makes the page fail-open with raw input. (Shipped ahead of the
       picker because §1.3's auto-trigger needs *some* transform
       endpoint to call.)
+- [x] **Error surfacing contract:** on a non-zero exit from
+      `voiceitt-transform`, the bridge writes the subprocess's full
+      stderr — which by contract includes the upstream provider's HTTP
+      status code and raw response body (or the `curl` exit code +
+      stderr on transport failure) — verbatim to `server.log`. The
+      HTTP response back to the page stays a single-line 502 so the
+      §1.3 fail-open behaviour is unchanged; the diagnosable detail
+      lives in the log, not the wire. Stock `BaseHTTPRequestHandler`
+      access/error log lines are suppressed (`log_request` /
+      `log_error` overridden to no-ops) so each round-trip produces
+      exactly one log entry — the rich `transform: in=… out=…` line
+      on success or the multi-line failure block on error.
   - [ ] `GET /prompts/` returns a JSON array of `.md` filenames in
         `~/.config/voiceitt-bridge/prompts/` (needed by §1.2's picker).
   - [ ] `POST /active-prompt` with body `{ "id": "<filename>" }` (or
