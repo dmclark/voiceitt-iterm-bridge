@@ -27,7 +27,7 @@ for cmd in curl jq; do
   fi
 done
 
-MODEL="${VOICEITT_TRANSFORM_MODEL:-gemini-2.5-flash}"
+MODEL="${VOICEITT_TRANSFORM_MODEL:-gemini-2.5-flash-lite}"
 # REVISIT: default timeout. 6s chosen for v0 standalone testing because
 # observed gemini-2.5-flash latency is ~1–5s with occasional outliers above
 # 2.5s. When the send-to-* wrappers gain a fail-open-to-raw-clipboard path,
