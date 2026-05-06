@@ -73,6 +73,17 @@ class Handler(SimpleHTTPRequestHandler):
             "%s %s - %s\n" % (_ts(), self.address_string(), fmt % args)
         )
 
+    # Suppress the stock per-request access line and send_error's
+    # "code N, message ..." follow-up. We already emit a richer
+    # "transform: in=… out=…" line on success and a multi-line block
+    # with the upstream API body on failure; the default lines are
+    # pure noise on top of that.
+    def log_request(self, *args, **kwargs):
+        pass
+
+    def log_error(self, *args, **kwargs):
+        pass
+
     def do_POST(self):
         if self.path != "/transform":
             self.send_error(404, "unknown endpoint")
