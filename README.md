@@ -13,9 +13,9 @@ paste — then jump back to dictate the next bit. One Raycast hotkey per target.
 
 ## Why
 
-Voiceitt only works in Chrome. Most CLI work happens in a terminal. This
+Voiceitt only works in Chrome. Most writing happens outside the browser. This
 bridges the gap without any custom server, web UI, or API integration — just a
-tiny local HTML scratchpad served over `http://localhost`, plus a few Raycast
+tiny local HTML scratchpad served over `http://localhost`, plus a few [Raycast](https://www.raycast.com/)
 Script Commands.
 
 ## Architecture
