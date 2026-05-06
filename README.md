@@ -4,11 +4,12 @@
 
 ---
 
-A small toolkit that lets you dictate prompts with [Voiceitt](https://www.voiceitt.com/)
-(a Chrome-only voice dictation extension) and send them straight into the
-**current iTerm tab** — whatever shell, REPL, or CLI tool (Amp, Claude Code,
-`bash`, `python`, `ssh`, …) is running there — then jump back to dictate the
-next prompt.
+A small toolkit that lets you dictate text with [Voiceitt](https://www.voiceitt.com/)
+(a Chrome-only voice dictation extension) and send it straight into
+**whatever Mac app you're working in** — a terminal (iTerm and the shell, REPL,
+or CLI tool running in it: Amp, Claude Code, `bash`, `python`, `ssh`, …), an
+editor (VS Code), a chat or browser textarea, anything that accepts a `Cmd+V`
+paste — then jump back to dictate the next bit. One Raycast hotkey per target.
 
 ## Why
 
