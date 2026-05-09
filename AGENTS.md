@@ -29,19 +29,8 @@ skill. Do not push parking-lot commits unless the user explicitly asks.
 
 ## Branches and commits
 
-- Work happens on topic branches; `main` is always releasable.
-- Branch prefix matches commit type:
-  - `feat/<slug>` — new functionality
-  - `fix/<slug>` — bug fix
-  - `chore/<slug>` — tooling, deps, docs-only refactors
-  - `docs/<slug>` — substantive documentation work
-  - `explore/<slug>` — spike / throwaway investigation
-- Use `feat/`, never `feature/`. Use `fix/`, never `bugfix/` or `hotfix/`.
-- Commit messages follow Conventional Commits: `type(scope): summary`
-  (e.g. `feat(scripts): add send-to-slack`, `chore(parking-lot): …`).
-- One logical change per commit. Don't bundle unrelated edits — split them
-  into separate commits even on the same branch.
-- Never push without explicit user instruction.
+Use the `conventional-commits` skill. Repo-specific scopes you'll see often:
+`scripts`, `bridge`, `install`, `parking-lot`, `agents`, `skills`, `roadmap`, `erd`.
 
 ## Conventions for new `send-to-*.sh` scripts
 
