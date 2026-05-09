@@ -126,10 +126,20 @@
     // Default focus into the top (Dictated) pane so Voiceitt has somewhere
     // to write. We do NOT force focus back to it on every click anymore
     // (ERD §1.3 makes the bottom pane editable, so users need to be able
-    // to click into it). Window-level focus still re-snaps to pad so a
-    // freshly-restored Chrome window is dictation-ready.
+    // to click into it).
+    //
+    // Window-level focus re-snaps to pad ONLY if no textarea currently
+    // has focus. That covers the "freshly-restored Chrome window" case
+    // (caret has been lost, restore it to the dictation pane) without
+    // stealing focus from `pad-out` when Raycast briefly takes OS focus
+    // to fire a send-to-* script. Without this guard, sending from the
+    // bottom pane would always copy the top pane instead.
     function refocus() { pad.focus(); }
-    window.addEventListener('focus', refocus);
+    window.addEventListener('focus', () => {
+      if (!(document.activeElement instanceof HTMLTextAreaElement)) {
+        refocus();
+      }
+    });
     setTimeout(refocus, 0);
 
     function clearAll() {
