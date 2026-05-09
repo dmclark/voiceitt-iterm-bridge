@@ -97,12 +97,23 @@
     #status.busy { color: #b07d00; }
     #status.ok   { color: #2e7d32; }
     #status.warn { color: #ff3b30; }
+    /*
+     * AI master toggle (ERD §1.0). Default OFF — auto-trigger fires only
+     * when checked. Sits between the status indicator and the Clear
+     * button so the user has a single, glanceable answer to "is the LLM
+     * touching my dictation right now?".
+     */
+    #ai-toggle-label { font-size: 11px; color: #666; display: inline-flex; align-items: center; gap: 4px; cursor: pointer; user-select: none; }
+    #ai-toggle { margin: 0; cursor: pointer; }
   </style>
 </head>
 <body>
   <header>
     <span>Voiceitt Scratchpad — dictate here, then trigger your Raycast hotkey.</span>
     <span id="status" aria-live="polite" title="LLM transform status">idle</span>
+    <label id="ai-toggle-label" title="When checked, each dictated phrase is sent through the LLM transform. Off by default. ⌘↵ in the input pane runs a one-shot transform regardless.">
+      <input type="checkbox" id="ai-toggle"> AI
+    </label>
     <button id="clear" title="Clear (⌘K)">Clear</button>
   </header>
   <div class="pane">
@@ -121,7 +132,25 @@
     const padOut = document.getElementById('pad-out');
     const clearBtn = document.getElementById('clear');
     const statusEl = document.getElementById('status');
+    const aiToggle = document.getElementById('ai-toggle');
     const fauxCaret = document.getElementById('faux-caret');
+
+    /*
+     * ===========================================================
+     *  AI master toggle (ERD §1.0)
+     * ===========================================================
+     *
+     * Default-off opt-in for LLM post-processing. Inverts the §1.3
+     * MVP behaviour (which auto-fired on every utterance) so the
+     * baseline cost of dictating is zero LLM calls. Persisted to
+     * localStorage so the choice survives reloads. ⌘↵ in the input
+     * pane stays as a one-shot override that fires the transform
+     * once regardless of the toggle state — useful for "try the
+     * LLM on this one phrase without flipping the master switch".
+     */
+    const AI_TOGGLE_KEY = 'voiceitt-bridge:ai-enabled';
+    let aiEnabled = localStorage.getItem(AI_TOGGLE_KEY) === '1';
+    aiToggle.checked = aiEnabled;
 
     // Default focus into the top (Dictated) pane so Voiceitt has somewhere
     // to write. We do NOT force focus back to it on every click anymore
@@ -145,10 +174,13 @@
     function clearAll() {
       pad.value = ''; padOut.value = '';
       lastInputSentToLLM = '';
-      setStatus('idle');
+      setStatus(aiEnabled ? 'idle' : 'off');
       refocus(); updateFauxCaret();
     }
     clearBtn.addEventListener('click', clearAll);
+
+    // Initial status reflects the persisted toggle state on first paint.
+    if (!aiEnabled) setStatus('off');
 
     // Cmd+K to clear (works regardless of focused pane).
     window.addEventListener('keydown', (e) => {
@@ -202,7 +234,35 @@
     pad.addEventListener('input', () => {
       if (!voiceittWriting) return;
       voiceittWriting = false;
+      // Master toggle off: skip the LLM, just mirror the dictated text
+      // into the bottom pane so the focus-driven send still works the
+      // way the user expects ("send from whichever pane I'm in").
+      if (!aiEnabled) {
+        padOut.value = pad.value;
+        setStatus('off');
+        return;
+      }
       scheduleTransform();
+    });
+
+    // Toggle handler: persist, and immediately reflect the new state.
+    // Disabling mid-call: abort any in-flight transform so the result
+    // doesn't land after the user opted out, then mirror the current
+    // input so the bottom pane is in a sensible state for the next send.
+    aiToggle.addEventListener('change', () => {
+      aiEnabled = aiToggle.checked;
+      localStorage.setItem(AI_TOGGLE_KEY, aiEnabled ? '1' : '0');
+      if (!aiEnabled) {
+        clearTimeout(debounceTimer);
+        if (inFlight) { inFlight.abort(); inFlight = null; }
+        padOut.value = pad.value;
+        setStatus('off');
+      } else {
+        // Don't fire retroactively on whatever's already in pad —
+        // wait for the next utterance (or ⌘↵) so enabling the toggle
+        // is never surprisingly expensive.
+        setStatus('idle');
+      }
     });
 
     function scheduleTransform() {
