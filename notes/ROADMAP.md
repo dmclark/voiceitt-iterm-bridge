@@ -122,14 +122,16 @@ guesses instead of what actually worked.
 <summary><h2 style="display:inline">0.5. Two-pane scratchpad + a little visual polish (prep for §1)</h2></summary>
 
 
-**Status: largely complete.** Shipped in [PR #2](https://github.com/dmclark/voiceitt-iterm-bridge/pull/2):
+**Status: complete.** Shipped in [PR #2](https://github.com/dmclark/voiceitt-iterm-bridge/pull/2):
 two-pane layout, mirror-on-input wiring, Atkinson Hyperlegible
 typography pass, warmer background + rounded panes, caret-visibility
 combo (high-contrast colour + focus font-size bump + focused-pane tint
-+ custom faux-caret overlay). **Still pending:** ERD §0.5.2 — updating
-the `send-to-*.sh` scripts to Cmd+A/Cmd+C the bottom (`pad-out`)
-textarea instead of the top one. That's the last remaining block before
-§1 can build on top.
++ custom faux-caret overlay). The pane-targeting piece originally
+scoped as ERD §0.5.2 was solved page-side instead of per-script:
+`bridge/dictate.html` no longer steals focus when Raycast briefly takes
+OS focus, so the existing `send-to-*.sh` scripts now copy from whichever
+pane the user has focused. Side benefit: focusing the top pane sends
+the raw dictated text, bypassing the LLM transform on demand.
 
 **Priority: do this before §1.** The scratchpad is currently a single
 `<textarea>` that gets dictated into and then Cmd+A/Cmd+C'd straight onto

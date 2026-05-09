@@ -141,12 +141,25 @@ any LLM work in §1.
 <details open>
 <summary><h3 style="display:inline">0.5.2 Send-script retargeting</h3></summary>
 
-- [ ] Update `send-to-iterm.sh` and `send-to-iterm-and-run.sh` to
-      Cmd+A/Cmd+C the **bottom** textarea (`pad-out`) instead of `pad`.
-- [ ] Same change in `send-to-vscode.sh` and any future `send-to-*.sh`
-      shipped by §0.3.
-- [ ] Smoke-test with Sticky Keys ON: dictate → bottom pane mirrors →
-      hotkey pastes the right text into iTerm and VS Code.
+**Design pivot.** Original plan was to hard-code each `send-to-*.sh` to
+target `pad-out`. Replaced with a page-side fix: `bridge/dictate.html`
+no longer steals focus back to `pad` when Raycast briefly takes OS
+focus, so the existing scripts (which already do `Cmd+A` / `Cmd+C` in
+the focused app) now copy from whichever pane the user has focused.
+Side benefit: lets the user deliberately send the raw `pad` text by
+clicking into it before the hotkey, which the original plan would have
+prevented.
+
+- [x] ~~Update `send-to-iterm.sh` and `send-to-iterm-and-run.sh` to
+      Cmd+A/Cmd+C the **bottom** textarea (`pad-out`) instead of `pad`.~~
+      *Superseded by `fix(bridge): send-to-* respects which pane has focus`
+      — no per-script edits needed.*
+- [x] ~~Same change in `send-to-vscode.sh` and any future `send-to-*.sh`
+      shipped by §0.3.~~ *Superseded; new `send-to-*.sh` scripts get the
+      focus-driven behaviour for free via the page fix.*
+- [ ] Smoke-test with Sticky Keys ON: focus the bottom pane → hotkey
+      pastes cleaned text; focus the top pane → hotkey pastes raw
+      dictated text. Repeat for iTerm and VS Code.
 
 </details>
 
