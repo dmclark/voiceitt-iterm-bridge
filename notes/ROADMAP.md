@@ -299,6 +299,24 @@ in?" and "where in that pane is my caret?" without any JS. Save (4) and
 <summary><h2 style="display:inline">1. AI post-processing</h2></summary>
 
 
+**Design pivot — default-off, opt-in via master toggle.** The original §1
+plan (and the §1.3 MVP that shipped behind it) auto-fires the LLM
+transform on every Voiceitt utterance, with `Off — paste as dictated`
+buried as one of the prompt-picker entries. That's been inverted: a
+**master `AI` toggle in the scratchpad header** (default OFF, persisted
+to `localStorage`) gates the auto-trigger entirely. With the toggle off,
+the page mirrors `pad → pad-out` and never calls the LLM; with it on,
+the §1.3 mechanics described below take over. `⌘↵` in the input pane
+remains a one-shot override that fires the transform once regardless of
+toggle state, so users can try the LLM on a single phrase without
+flipping the master switch. The `Off — paste as dictated` picker entry
+described in §1.2 / §1.3 is **superseded** by the master toggle —
+keeping both would be redundant.
+
+Everything in the prose below describes the mechanics *when the toggle
+is on*. When it's off, none of it runs.
+
+
 <details open>
 <summary><h3 style="display:inline">Inspiration</h3></summary>
 

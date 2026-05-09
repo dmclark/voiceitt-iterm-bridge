@@ -248,6 +248,44 @@ hardcoded), and updating the `send-to-*.sh` scripts to copy from
 verifiable in-page (dictate → bottom pane fills with cleaned text) but
 the existing send hotkeys still pick up the raw text from `pad`.
 
+**Default-off pivot (§1.0 below).** The MVP described in this status
+block auto-fires the transform on every utterance. That has been
+inverted: the auto-trigger is now gated on a master `AI` toggle in the
+header, default OFF. The mechanics in §1.3 still apply *when the toggle
+is on*; with it off, the page just mirrors `pad → pad-out` and never
+calls the LLM. `⌘↵` keeps its one-shot-override behaviour.
+
+<details open>
+<summary><h3 style="display:inline">1.0 AI master toggle (default-off opt-in)</h3></summary>
+
+The single switch that turns the entire §1 pipeline on. Inverts the
+§1.3 MVP's auto-by-default behaviour so fresh installs cost zero LLM
+calls until the user opts in.
+
+- [x] Add a checkbox + label `AI` to the scratchpad header in
+      `bridge/dictate.html`, between the status indicator and the
+      Clear button.
+- [x] Persist state to `localStorage` under
+      `voiceitt-bridge:ai-enabled`. Default OFF.
+- [x] Gate the §1.3 auto-trigger on the toggle: when OFF, mirror
+      `pad.value → padOut.value` and set status to `off`; when ON,
+      call `scheduleTransform()` as before.
+- [x] Toggling OFF mid-call aborts any in-flight transform so a stale
+      result doesn't land after the user opted out.
+- [x] Toggling ON does **not** retroactively fire on whatever's already
+      in `pad` — the next utterance triggers normally. Avoids surprise
+      LLM cost on toggle-flip.
+- [x] `⌘↵` in the input pane remains a one-shot override that fires
+      the transform regardless of toggle state.
+- [x] Initial status indicator reflects the persisted toggle state
+      (`off` on first paint when the toggle starts unchecked).
+- [ ] Smoke-test: fresh `localStorage`, dictate three phrases, confirm
+      no `/transform` POSTs in DevTools Network panel and `pad-out`
+      mirrors `pad`. Then check the box, dictate, confirm one POST
+      per utterance and the cleaned text lands in `pad-out`.
+
+</details>
+
 <details open>
 <summary><h3 style="display:inline">1.1 Prompt files (one Markdown file per prompt)</h3></summary>
 
@@ -273,9 +311,12 @@ the existing send hotkeys still pick up the raw text from `pad`.
       `$VOICEITT_MODEL` (default `claude-haiku-4-5`). Per-prompt
       overrides via optional YAML front matter are a planned follow-up,
       not v1.
-- [ ] Decide v1 first-load default: select `default.md` (most users
+- [x] ~~Decide v1 first-load default: select `default.md` (most users
       benefit) vs the synthesised `Off — paste as dictated` entry
-      (surprise-free). Recommend `Off`; record the call here when made.
+      (surprise-free). Recommend `Off`; record the call here when made.~~
+      *Subsumed by §1.0: the master toggle is the surprise-free default
+      (off). When the toggle is on, the picker can default to
+      `default.md` without revisiting this question.*
 
 </details>
 
@@ -287,8 +328,11 @@ the existing send hotkeys still pick up the raw text from `pad`.
 - [ ] Populate options at page load from a `GET /prompts/` directory
       listing served by the local bridge server (one option per `.md`
       file). Display label derived from filename per §1.1.
-- [ ] First option is always the synthesised **`Off — paste as
-      dictated`** (not a file on disk; the picker prepends it).
+- [-] ~~First option is always the synthesised **`Off — paste as
+      dictated`** (not a file on disk; the picker prepends it).~~
+      *Superseded by §1.0's master toggle. The picker only lists real
+      `.md` files; turning the LLM off entirely is what the toggle is
+      for.*
 - [ ] Persist current selection (filename, or the literal string `off`)
       to `localStorage` so it survives reloads.
 - [ ] On change, write the chosen filename (or `off`) to
