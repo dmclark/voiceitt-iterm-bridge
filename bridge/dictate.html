@@ -105,6 +105,13 @@
      */
     #ai-toggle-label { font-size: 11px; color: #666; display: inline-flex; align-items: center; gap: 4px; cursor: pointer; user-select: none; }
     #ai-toggle { margin: 0; cursor: pointer; }
+    /*
+     * Hide the "To be pasted" pane entirely when AI is off — the
+     * binary is supposed to read as "AI on = two panes; AI off = one
+     * pane, send what you dictated". The Dictated pane's `flex: 1`
+     * automatically expands to fill the body once its sibling is gone.
+     */
+    body.ai-off #pane-out { display: none; }
   </style>
 </head>
 <body>
@@ -120,7 +127,7 @@
     <div class="pane-label">Dictated</div>
     <textarea id="pad" autofocus placeholder="Start dictating with Voiceitt…"></textarea>
   </div>
-  <div class="pane">
+  <div class="pane" id="pane-out">
     <div class="pane-label">To be pasted</div>
     <textarea id="pad-out"
       placeholder="LLM-cleaned text appears here after each dictated phrase. Edit before sending if needed; ⌘↵ in the top pane re-runs the transform."></textarea>
@@ -151,6 +158,15 @@
     const AI_TOGGLE_KEY = 'voiceitt-bridge:ai-enabled';
     let aiEnabled = localStorage.getItem(AI_TOGGLE_KEY) === '1';
     aiToggle.checked = aiEnabled;
+
+    // Body class drives the CSS that hides #pane-out when AI is off.
+    // Kept as a body class (rather than inline style on #pane-out)
+    // so future visibility-coupled rules — e.g. dimming the status
+    // indicator, repositioning the faux caret — can hook the same flag.
+    function applyAiVisibility() {
+      document.body.classList.toggle('ai-off', !aiEnabled);
+    }
+    applyAiVisibility();
 
     // Default focus into the top (Dictated) pane so Voiceitt has somewhere
     // to write. We do NOT force focus back to it on every click anymore
@@ -257,12 +273,18 @@
         if (inFlight) { inFlight.abort(); inFlight = null; }
         padOut.value = pad.value;
         setStatus('off');
+        // If pad-out had focus when the user disabled AI, the pane
+        // about to be hidden was the active element — bounce focus
+        // back to the still-visible input pane so the next dictation
+        // (or hotkey send) lands on something sensible.
+        if (document.activeElement === padOut) refocus();
       } else {
         // Don't fire retroactively on whatever's already in pad —
         // wait for the next utterance (or ⌘↵) so enabling the toggle
         // is never surprisingly expensive.
         setStatus('idle');
       }
+      applyAiVisibility();
     });
 
     function scheduleTransform() {
@@ -313,10 +335,13 @@
 
     // Manual trigger: ⌘↵ on the input field re-runs the transform,
     // bypassing the lastInputSentToLLM gate (so post-edit re-runs
-    // actually go through).
+    // actually go through). Gated on the master toggle: if AI is
+    // off, ⌘↵ is a no-op — "off means off", and firing the LLM into
+    // the hidden pad-out would be invisible work.
     pad.addEventListener('keydown', (e) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
         e.preventDefault();
+        if (!aiEnabled) return;
         clearTimeout(debounceTimer);
         lastInputSentToLLM = '';
         runTransform();
