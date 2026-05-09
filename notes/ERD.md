@@ -275,14 +275,26 @@ calls until the user opts in.
 - [x] Toggling ON does **not** retroactively fire on whatever's already
       in `pad` — the next utterance triggers normally. Avoids surprise
       LLM cost on toggle-flip.
-- [x] `⌘↵` in the input pane remains a one-shot override that fires
-      the transform regardless of toggle state.
+- [x] `⌘↵` in the input pane is **also gated** on the toggle: no-op
+      when AI is off. "Off means off" across both auto-trigger and
+      manual-trigger paths; firing the LLM with `pad-out` hidden would
+      be invisible work. To try the LLM on a single phrase, flip the
+      toggle on first.
 - [x] Initial status indicator reflects the persisted toggle state
       (`off` on first paint when the toggle starts unchecked).
+- [x] **Hide `#pane-out` entirely when AI is off.** Body class
+      `ai-off` drives the CSS rule `body.ai-off #pane-out { display:
+      none; }`. The Dictated pane's `flex: 1` expands to fill the body
+      automatically. Toggling off while `pad-out` had focus bounces
+      focus back to `pad` so the next dictation / hotkey send lands on
+      a visible target. Reinforces the binary: AI on = two panes; AI
+      off = single-pane scratchpad.
 - [ ] Smoke-test: fresh `localStorage`, dictate three phrases, confirm
-      no `/transform` POSTs in DevTools Network panel and `pad-out`
-      mirrors `pad`. Then check the box, dictate, confirm one POST
-      per utterance and the cleaned text lands in `pad-out`.
+      no `/transform` POSTs in DevTools Network panel and only the
+      Dictated pane is visible. Then check the box: `pad-out` appears,
+      dictate, confirm one POST per utterance and the cleaned text
+      lands in `pad-out`. Uncheck mid-flight: `pad-out` disappears and
+      the in-flight request is cancelled in the Network panel.
 
 </details>
 

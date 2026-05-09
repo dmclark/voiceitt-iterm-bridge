@@ -304,12 +304,17 @@ plan (and the §1.3 MVP that shipped behind it) auto-fires the LLM
 transform on every Voiceitt utterance, with `Off — paste as dictated`
 buried as one of the prompt-picker entries. That's been inverted: a
 **master `AI` toggle in the scratchpad header** (default OFF, persisted
-to `localStorage`) gates the auto-trigger entirely. With the toggle off,
-the page mirrors `pad → pad-out` and never calls the LLM; with it on,
-the §1.3 mechanics described below take over. `⌘↵` in the input pane
-remains a one-shot override that fires the transform once regardless of
-toggle state, so users can try the LLM on a single phrase without
-flipping the master switch. The `Off — paste as dictated` picker entry
+to `localStorage`) is the single binary that gates the entire pipeline.
+With the toggle off:
+
+- the page never calls the LLM (auto-trigger AND `⌘↵` are both no-ops);
+- the **`pad-out` pane is hidden entirely** — the scratchpad collapses
+  to a single-pane "dictate and send" surface;
+- the existing focus-driven `send-to-*` flow keeps working unchanged
+  (only `pad` is visible, so it's always the focused pane).
+
+With the toggle on, both panes are visible and the §1.3 mechanics
+described below take over. The `Off — paste as dictated` picker entry
 described in §1.2 / §1.3 is **superseded** by the master toggle —
 keeping both would be redundant.
 
