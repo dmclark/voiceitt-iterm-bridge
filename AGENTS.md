@@ -45,32 +45,10 @@ skill. Do not push parking-lot commits unless the user explicitly asks.
 
 ## Conventions for new `send-to-*.sh` scripts
 
-When adding a new target app, copy the closest existing script and edit only what's necessary. Two strategies:
-
-- **AppleScript** (e.g. `send-to-iterm.sh`) — when the target app has a useful scripting dictionary for inserting text into the active session.
-- **cliclick paste** (e.g. `send-to-vscode.sh`) — the default for everything else. Activates the app by bundle id, then issues a synthetic `Cmd+V` via cliclick.
-
-Every script must keep these Sticky-Keys-safe steps intact:
-
-1. Stamp clipboard with a `SENTINEL`.
-2. Release stuck modifiers via `cliclick ku:cmd,alt,ctrl,shift,fn`.
-3. Issue Cmd+A / Cmd+C through `cliclick` (not AppleScript `keystroke ... using command down`).
-4. Poll `pbpaste` for up to ~1s to confirm the copy actually fired.
-5. On timeout, `osascript display notification ...` and `exit 1` instead of pasting stale text.
-6. Then perform the destination-specific paste.
-
-Required Raycast header lines (script will not appear in Raycast otherwise — `install.sh` filters on `@raycast.schemaVersion`):
-
-```bash
-# @raycast.schemaVersion 1
-# @raycast.title <Send to App>
-# @raycast.mode silent
-# @raycast.packageName Voiceitt
-# @raycast.icon <emoji>
-# @raycast.description <one line>
-```
-
-After adding or renaming a script: `chmod +x scripts/<file>.sh && ./install.sh`.
+When the user asks to add a new Raycast target app, use the
+`adding-send-to-target` skill. It encodes the strategy choice
+(cliclick-paste vs AppleScript), the Sticky-Keys-safe ritual, and the
+required Raycast headers, and routes through `scripts/new-shortcut.sh`.
 
 Helpers without a `@raycast.schemaVersion` header (e.g. `new-shortcut.sh`, `voiceitt-transform`) are intentionally excluded from the Raycast symlink loop — don't add the header to them.
 
