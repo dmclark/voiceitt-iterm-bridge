@@ -112,6 +112,16 @@
      * automatically expands to fill the body once its sibling is gone.
      */
     body.ai-off #pane-out { display: none; }
+    /*
+     * Loaded-file strip (PARKING-LOT 2026-05-13 → graduated).
+     * Sits just under the header when a file has been pushed in via
+     * `scripts/load-file-to-scratchpad.sh` → POST /load. Tells the user
+     * what they're about to edit; basename only to keep it scannable.
+     * Hidden by default; the script reveals it once a file is loaded.
+     */
+    #loaded-strip { display: none; padding: 4px 14px; font-size: 11px; color: #666; background: #f0efea; border-bottom: 1px solid #e6e6e1; font-family: ui-monospace, "SF Mono", Menlo, monospace; }
+    #loaded-strip.shown { display: block; }
+    #loaded-strip .label { text-transform: uppercase; letter-spacing: 0.06em; color: #999; margin-right: 6px; }
   </style>
 </head>
 <body>
@@ -121,8 +131,19 @@
     <label id="ai-toggle-label" title="When checked, each dictated phrase is sent through the LLM transform. Off by default. ⌘↵ in the input pane runs a one-shot transform regardless.">
       <input type="checkbox" id="ai-toggle"> AI
     </label>
+    <button id="load" title="Load a local file (≤ 50 KB, UTF-8) into the input pane">Load…</button>
     <button id="clear" title="Clear (⌘K)">Clear</button>
+    <!-- Hidden file picker driven by the Load… button. We can't use the
+         server's POST /load path here because browsers don't expose the
+         absolute filesystem path from <input type="file"> for security
+         reasons — so this path is intentionally browser-only and reads
+         the file via FileReader. The Raycast loader (which DOES know the
+         absolute path) is still the way to round-trip server-side state. -->
+    <input id="file-picker" type="file" style="display:none">
   </header>
+  <div id="loaded-strip" title="Loaded via Raycast → 'Load File into Scratchpad'">
+    <span class="label">file</span><span id="loaded-path"></span>
+  </div>
   <div class="pane">
     <div class="pane-label">Dictated</div>
     <textarea id="pad" autofocus placeholder="Start dictating with Voiceitt…"></textarea>
@@ -191,6 +212,13 @@
       pad.value = ''; padOut.value = '';
       lastInputSentToLLM = '';
       setStatus(aiEnabled ? 'idle' : 'off');
+      // Drop the loaded-file strip too — Clear means "back to a blank
+      // scratchpad", which includes forgetting the just-loaded filename.
+      // Server-side state (in-memory _loaded slot) is intentionally NOT
+      // touched: a fresh page load shouldn't resurrect cleared text, but
+      // we also can't usefully PUT empty state from here without a new
+      // endpoint, so we just clear the local view.
+      hideLoadedStrip();
       refocus(); updateFauxCaret();
     }
     clearBtn.addEventListener('click', clearAll);
@@ -460,6 +488,133 @@
     padOut.addEventListener('transitionrun', trackTransition);
 
     requestAnimationFrame(updateFauxCaret);
+
+    /*
+     * ===========================================================
+     *  Local-file loader (PARKING-LOT 2026-05-13 → graduated)
+     * ===========================================================
+     *
+     * `scripts/load-file-to-scratchpad.sh` pops a macOS open-panel,
+     * POSTs the chosen path to /load, and the server holds the file
+     * contents in a single in-memory slot. This block:
+     *
+     *   - on page load, GETs /file once and populates the input pane
+     *     if the slot is non-empty (so opening the scratchpad after
+     *     the load still picks up the file);
+     *   - keeps an EventSource open against /events; on `reload`
+     *     re-fetches /file and swaps content live in the open tab.
+     *
+     * Direct `pad.value = ...` does NOT fire the auto-trigger
+     * (voiceittWriting only latches on synthetic paste from Voiceitt's
+     * insertHTML), so loading a file never costs an LLM call.
+     */
+    const loadedStrip = document.getElementById('loaded-strip');
+    const loadedPath = document.getElementById('loaded-path');
+    const loadBtn = document.getElementById('load');
+    const filePicker = document.getElementById('file-picker');
+
+    // 50 KB / UTF-8 / hide-on-clear caps mirror the server's POST /load
+    // checks (see bridge/serve.py MAX_LOAD_BYTES). Browser path can't
+    // enforce $HOME containment — the OS open-panel already restricts
+    // what the user can pick, and there's no path leakage either way.
+    const MAX_LOAD_BYTES = 50 * 1024;
+
+    function showLoadedStrip(displayName, fullPath) {
+      loadedPath.textContent = displayName;
+      loadedStrip.title = fullPath || displayName;
+      loadedStrip.classList.add('shown');
+    }
+    function hideLoadedStrip() {
+      loadedStrip.classList.remove('shown');
+      loadedPath.textContent = '';
+      loadedStrip.title = '';
+    }
+
+    function applyLoadedFile(file) {
+      if (!file || !file.path) {
+        hideLoadedStrip();
+        return;
+      }
+      // basename only — full path lives in the title attr if curiosity strikes.
+      const base = file.path.split('/').pop() || file.path;
+      showLoadedStrip(base, file.path);
+      pad.value = file.text || '';
+      // Mirror into pad-out so an immediate send-to-* (when AI is off,
+      // pad-out is hidden but still the "outgoing" buffer in the AI-on
+      // case) reflects the just-loaded text instead of stale dictation.
+      padOut.value = pad.value;
+      // Reset the LLM dedupe gate so a manual ⌘↵ after edits actually fires.
+      lastInputSentToLLM = '';
+      refocus();
+      updateFauxCaret();
+    }
+
+    // Load… button → in-browser file picker. Reads via FileReader so
+    // we never need the absolute path (which the browser won't tell us
+    // anyway). For a server-side round-trip with a real path, use the
+    // Raycast 'Load File into Scratchpad' command.
+    loadBtn.addEventListener('click', () => filePicker.click());
+    filePicker.addEventListener('change', () => {
+      const f = filePicker.files && filePicker.files[0];
+      if (!f) return;
+      if (f.size > MAX_LOAD_BYTES) {
+        setStatus('too large', 'warn');
+        filePicker.value = '';
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = () => {
+        // FileReader.readAsText silently replaces invalid UTF-8 with U+FFFD;
+        // detect that and refuse so the user isn't editing mojibake.
+        const text = reader.result;
+        if (typeof text !== 'string' || text.indexOf('\uFFFD') !== -1) {
+          setStatus('not UTF-8', 'warn');
+          filePicker.value = '';
+          return;
+        }
+        showLoadedStrip(f.name, f.name);
+        pad.value = text;
+        padOut.value = text;
+        lastInputSentToLLM = '';
+        setStatus(aiEnabled ? 'idle' : 'off');
+        refocus();
+        updateFauxCaret();
+        filePicker.value = '';  // allow re-picking the same file
+      };
+      reader.onerror = () => {
+        setStatus('read failed', 'warn');
+        filePicker.value = '';
+      };
+      reader.readAsText(f, 'utf-8');
+    });
+
+    async function fetchLoadedFile() {
+      try {
+        const r = await fetch('/file', {cache: 'no-store'});
+        if (!r.ok) return;
+        applyLoadedFile(await r.json());
+      } catch (err) {
+        console.warn('GET /file failed', err);
+      }
+    }
+
+    // Deliberately NOT calling fetchLoadedFile() on initial page load.
+    // Page reload always starts clean (per the user's mental model: "a
+    // reload starts with a clean slate"). Server-side _loaded state may
+    // still be non-empty from a previous Raycast load, but it just sits
+    // there unused — only the live SSE `reload` path surfaces it. The
+    // Raycast loader assumes the scratchpad tab is already open.
+    //
+    // SSE: the server sends `event: reload` whenever /load succeeds.
+    // EventSource auto-reconnects with backoff, so we don't need our own
+    // retry loop — losing the connection just means the next /load won't
+    // live-swap until the browser reopens it.
+    try {
+      const es = new EventSource('/events');
+      es.addEventListener('reload', fetchLoadedFile);
+    } catch (err) {
+      console.warn('EventSource unavailable; live reload disabled', err);
+    }
   </script>
 </body>
 </html>

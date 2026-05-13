@@ -631,6 +631,106 @@ recogniser, which we don't control. Two mechanisms, A then B.
 ---
 
 <details open>
+<summary><h2 style="display:inline">1.6 Local-file loader for the scratchpad</h2></summary>
+
+Goal: open an arbitrary local text file in the scratchpad's input pane so
+the user can edit it by voice and push the result to a target app via the
+existing `send-to-*.sh` flow. See ROADMAP §1.6 for design / tradeoffs.
+
+<details open>
+<summary><h3 style="display:inline">1.6.1 Server endpoints (`bridge/serve.py`)</h3></summary>
+
+- [x] `POST /load` accepts `{"path": "<abs or ~-relative>"}`.
+- [x] Path validation: resolves under `$HOME` (else 403), is a regular
+      file (else 404), ≤ 50 KB (else 413), decodes as UTF-8 (else 415).
+- [x] Stores `{path, text}` in a single in-memory slot, broadcasts a
+      `reload` event to every SSE subscriber.
+- [x] `GET /file` returns the slot as JSON `{"path": "...", "text": "..."}`.
+- [x] `GET /events` long-lived Server-Sent Events stream; emits
+      `event: reload` per `POST /load`, plus a 15 s heartbeat comment.
+- [x] Subscribers tracked in a process-global list under a `threading.Lock`,
+      cleaned up on `BrokenPipeError` / `ConnectionResetError`.
+
+</details>
+
+<details open>
+<summary><h3 style="display:inline">1.6.2 Page UI (`bridge/dictate.html`)</h3></summary>
+
+- [x] **Load…** button in the header (between AI toggle and Clear) opens a
+      hidden `<input type="file">`; reads via `FileReader` with the same
+      50 KB / UTF-8 caps as the server.
+- [x] Loaded-file strip under the header shows the basename; full path in
+      the `title` attr; hidden by default, revealed on load.
+- [x] **Clear** hides the strip in addition to wiping `pad`/`pad-out`.
+- [x] On any successful load (Raycast or in-page), `pad` and `pad-out` are
+      both populated; `lastInputSentToLLM` is reset so a manual `⌘↵` after
+      edits actually re-fires the LLM.
+- [x] `EventSource('/events')` listens for `reload`; on event, re-fetches
+      `/file` and swaps content live.
+- [x] Initial page load does **not** auto-fetch `/file`. Per the user's
+      mental model, every reload starts clean; the Raycast loader assumes
+      the scratchpad tab is already open.
+- [x] Direct `pad.value = ...` assignment (which is how all loads work)
+      does not trip `voiceittWriting`, so loading a file never triggers an
+      LLM call.
+
+</details>
+
+<details open>
+<summary><h3 style="display:inline">1.6.3 Raycast Script Command</h3></summary>
+
+- [x] `scripts/load-file-to-scratchpad.sh` with proper `@raycast.*` headers.
+- [x] `osascript choose file` open-panel; user-cancel (`-128`) exits 0.
+- [x] POSTs `{"path":"..."}` to `http://localhost:7531/load`; surfaces the
+      server's one-line error in a `display notification` on failure.
+- [x] Distinguishes "server not reachable" (HTTP 000) from real 4xx
+      responses with a clearer message.
+- [x] On success, brings the existing Scratchpad Chrome window to the
+      front. Does **not** auto-launch it (that's `open-voiceitt.sh`'s job).
+- [x] Picked up automatically by `install.sh` (has `@raycast.schemaVersion`).
+
+</details>
+
+<details open>
+<summary><h3 style="display:inline">1.6.4 Verification</h3></summary>
+
+- [x] `GET /file` returns `{"path":"","text":""}` on a fresh server.
+- [x] `POST /load` of an in-`$HOME` UTF-8 file → 200, `GET /file` reflects it.
+- [x] `POST /load /etc/hosts` → 403.
+- [x] `POST /load <nonexistent>` → 404.
+- [x] `POST /load <60 KB file in $HOME>` → 413.
+- [x] `POST /load <binary file in $HOME>` → 415.
+- [x] SSE: open `/events`, fire `/load`, observe `event: reload` on the
+      stream within ~1 s.
+- [ ] **Manual end-to-end with Sticky Keys ON:**
+      - [ ] Open Scratchpad → trigger `Load File into Scratchpad` →
+            pick a `~`-anchored markdown file → strip + content appear.
+      - [ ] Dictate edits with Voiceitt; trigger `Send to VS Code`;
+            confirm the edited text lands intact and no modifiers
+            stay latched.
+      - [ ] Reload the tab → confirm pane and strip are blank.
+      - [ ] Click the in-page **Load…** button → pick a file →
+            confirm the same UI behaviour.
+
+</details>
+
+<details open>
+<summary><h3 style="display:inline">1.6.5 Out of scope (explicit)</h3></summary>
+
+- [-] **Save-back-to-file.** Not the loader's job; would be a separate
+      `send-to-file.sh` or `POST /save`.
+- [-] **Multiple files / recent-files dropdown.** Parked.
+- [-] **Auto-launching the scratchpad** when it isn't open. Use
+      `open-voiceitt.sh` first; the loader assumes the tab exists.
+- [-] **Persisting loaded state across page reloads.** Reload = clean.
+
+</details>
+
+</details>
+
+---
+
+<details open>
 <summary><h2 style="display:inline">2. Per-target scripts via a generator</h2></summary>
 
 Goal: graduate §0's minimal `new-shortcut.sh` into a real generator
