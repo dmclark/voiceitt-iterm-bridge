@@ -18,6 +18,7 @@ Format: `- YYYY-MM-DD  one-line idea`. Group by theme.
 - 2026-05-05  log original dictation + corrected text (sqlite?) to potentially submit corrections back to Voiceitt for model training
 - 2026-05-08  surface transform call status in a small box in the top-right of the output pane; maybe link to open server.log in a new window
 - 2026-05-13  load a local file into the scratchpad to edit with Voiceitt, then push to target app
+- 2026-05-13  scratchpad loader: support loading multiple files / recent-files dropdown
 
 ## Tooling / workflow
 
