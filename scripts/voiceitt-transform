@@ -1,10 +1,17 @@
 #!/bin/bash
 # voiceitt-transform — read dictated text on stdin, write LLM-cleaned text on stdout.
 #
-# v0: hardcoded provider (Google AI Studio / Gemini 2.5 Flash) and hardcoded
-# "fix dictation noise" prompt. No config file, no picker. This is a vertical
-# slice to validate that the cleaned output is good enough to be worth wiring
-# into the send-to-* scripts.
+# v0: hardcoded provider (Google AI Studio / Gemini 2.5 Flash). The system
+# prompt is loaded from $VOICEITT_BRIDGE_DIR/prompts/default.md (symlinked
+# to the repo's prompts/default.md by install.sh). The picker (§1.2) and
+# active-prompt sidecar (§1.4) aren't wired yet, so default.md is always
+# used.
+#
+# Bug fix (ERD §1.3): the dictated text is wrapped in <TRANSCRIPT>…</TRANSCRIPT>
+# before being sent as the user message. Without this framing — and without
+# the matching default.md system prompt that explains what <TRANSCRIPT> means
+# — utterances like "make a directory called src" were being interpreted by
+# the LLM as commands to execute rather than transcripts to clean up.
 #
 # Usage:
 #   echo "um so like make a directory called source" | scripts/voiceitt-transform
@@ -36,7 +43,22 @@ MODEL="${VOICEITT_TRANSFORM_MODEL:-gemini-2.5-flash-lite}"
 # which is typically sub-second.
 TIMEOUT="${VOICEITT_TRANSFORM_TIMEOUT:-6}"
 
-SYSTEM='Lightly clean dictated text. Remove disfluencies (um, uh, false starts, restarts). Fix obvious capitalisation and punctuation. Do not change wording, do not add information, do not summarise. Output only the cleaned text, with no surrounding quotes, no markdown fences, and no trailing newline.'
+# Load the system prompt from prompts/default.md. We resolve it relative to
+# the script's real path (following symlinks) so this works whether the
+# script is invoked from the repo or via the install.sh symlink at
+# ~/.config/voiceitt-bridge/voiceitt-transform.
+SCRIPT_REAL="$(python3 -c 'import os, sys; print(os.path.realpath(sys.argv[1]))' "$0")"
+SCRIPT_DIR="$(dirname "$SCRIPT_REAL")"
+PROMPT_FILE="${VOICEITT_BRIDGE_CONFIG:-$HOME/.config/voiceitt-bridge}/prompts/default.md"
+if [ ! -f "$PROMPT_FILE" ]; then
+  # Fallback: look next to the script in the repo (scripts/ -> ../prompts/).
+  PROMPT_FILE="$SCRIPT_DIR/../prompts/default.md"
+fi
+if [ ! -f "$PROMPT_FILE" ]; then
+  echo "voiceitt-transform: cannot find prompts/default.md (looked in \$VOICEITT_BRIDGE_CONFIG/prompts and $SCRIPT_DIR/../prompts)" >&2
+  exit 2
+fi
+SYSTEM="$(cat "$PROMPT_FILE")"
 
 INPUT="$(cat)"
 
@@ -45,7 +67,14 @@ if [ -z "$INPUT" ]; then
   exit 0
 fi
 
-REQUEST="$(jq -n --arg s "$SYSTEM" --arg u "$INPUT" '{
+# Wrap the dictated text in <TRANSCRIPT>…</TRANSCRIPT> so the LLM treats
+# it as input to clean rather than instructions to follow. The default.md
+# prompt expects exactly this framing.
+USER_MSG="<TRANSCRIPT>
+${INPUT}
+</TRANSCRIPT>"
+
+REQUEST="$(jq -n --arg s "$SYSTEM" --arg u "$USER_MSG" '{
   system_instruction: { parts: [{ text: $s }] },
   contents:           [{ role: "user", parts: [{ text: $u }] }],
   generationConfig:   { temperature: 0.2 }

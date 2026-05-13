@@ -308,12 +308,14 @@ calls until the user opts in.
       so the dropdown isn't a list of one on first run
       (e.g. `shell-command.md`, `bullet-list.md`, `polite-email.md`,
       `amp-prompt.md`).
-- [ ] `install.sh` symlinks the repo's `prompts/` dir →
+- [x] `install.sh` symlinks the repo's `prompts/` dir →
       `~/.config/voiceitt-bridge/prompts/` (idempotent, same convention
       already used for `bridge/dictate.html` and the Raycast scripts).
       User-added `.md` files in that directory survive re-installs;
       user edits to `default.md` (if they un-symlinked it) are never
       overwritten.
+      *Landed early as part of the §1.3 bug fix so `voiceitt-transform`
+      can read `default.md` from a stable path.*
 - [ ] **No `prompts.json`**, no top-level schema version, no `jq`-based
       lookup. Prompt id = filename (e.g. `default.md`); display label =
       filename minus `.md`, with `-`/`_` → spaces, title-cased
@@ -381,6 +383,19 @@ calls until the user opts in.
       "off" path today is the fail-open one when the server-side call
       errors — which writes the raw input into the output pane and
       flags `fail-open: raw` in the header status indicator.*
+- [x] **Bug fix:** the auto-trigger was sending the dictated text raw,
+      paired with `voiceitt-transform`'s placeholder one-line "fix
+      dictation noise" SYSTEM prompt. Result: utterances like
+      "make a directory called src" came back as the LLM trying to
+      *do* the command (or echoing a fenced shell snippet) instead of
+      cleaning the wording. Fixed in `voiceitt-transform` by (a)
+      loading the SYSTEM prompt from `prompts/default.md` (which
+      already explains the `<TRANSCRIPT>` framing) and (b) wrapping
+      stdin in `<TRANSCRIPT>…</TRANSCRIPT>` before sending it as the
+      user message. `install.sh` now also symlinks `prompts/` into
+      `~/.config/voiceitt-bridge/prompts/` (ticks the corresponding
+      §1.1 item early). The proper picker / active-prompt /
+      `.md`-by-id loading still belong to §1.2 / §1.4 / §1.5.
 
 </details>
 
