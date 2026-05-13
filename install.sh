@@ -34,6 +34,26 @@ done
 ln -sfn "$REPO_DIR/bridge/dictate.html" "$BRIDGE_DIR/dictate.html"
 echo "linked  $BRIDGE_DIR/dictate.html  ->  $REPO_DIR/bridge/dictate.html"
 
+# prompts/: directory of `.md` files whose body is the system prompt for the
+# LLM transform (ERD §1.1, §1.5). voiceitt-transform reads default.md from
+# here. Symlinking the whole directory means user-added prompts survive
+# re-installs and edits to default.md (when un-symlinked) are never overwritten.
+ln -sfn "$REPO_DIR/prompts" "$BRIDGE_DIR/prompts"
+echo "linked  $BRIDGE_DIR/prompts  ->  $REPO_DIR/prompts"
+
+# serve.py: tiny HTTP server with a POST /transform endpoint that shells
+# out to voiceitt-transform. Replaces `python3 -m http.server` (see
+# scripts/open-voiceitt.sh and bridge/serve.py).
+ln -sfn "$REPO_DIR/bridge/serve.py" "$BRIDGE_DIR/serve.py"
+echo "linked  $BRIDGE_DIR/serve.py  ->  $REPO_DIR/bridge/serve.py"
+
+# voiceitt-transform: the LLM-cleaning CLI. Not a Raycast Script Command
+# (no @raycast.schemaVersion header), so the Raycast loop above skips it;
+# symlink it explicitly so serve.py can find it next to itself.
+ln -sfn "$REPO_DIR/scripts/voiceitt-transform" "$BRIDGE_DIR/voiceitt-transform"
+chmod +x "$REPO_DIR/scripts/voiceitt-transform"
+echo "linked  $BRIDGE_DIR/voiceitt-transform  ->  $REPO_DIR/scripts/voiceitt-transform"
+
 cat <<MSG
 
 Done. Next steps:

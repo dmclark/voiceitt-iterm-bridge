@@ -12,6 +12,18 @@ PAD_PORT=7531
 PAD_URL="http://localhost:${PAD_PORT}/dictate.html"
 PAD_TITLE="Voiceitt Scratchpad"
 LOG_FILE="$PAD_DIR/server.log"
+ENV_FILE="$PAD_DIR/env"
+
+# Source $PAD_DIR/env if it exists, so server.py + voiceitt-transform see
+# secrets like $GOOGLE_API_KEY even when Raycast didn't inherit them from
+# the user's shell. Plain `KEY=value` lines (no `export` needed); see
+# ROADMAP §1 open question #3 / ERD §1.5.
+if [ -f "$ENV_FILE" ]; then
+  set -a
+  # shellcheck disable=SC1090
+  . "$ENV_FILE"
+  set +a
+fi
 
 # 1) If a Chrome window with our title is already open, just bring it forward.
 ALREADY_OPEN=$(osascript <<EOF
@@ -35,9 +47,14 @@ if [ "$ALREADY_OPEN" = "true" ]; then
 fi
 
 # 2) Make sure our local HTTP server is running on $PAD_PORT.
+#    Uses bridge/serve.py (a small http.server subclass) so the page can
+#    POST /transform to invoke voiceitt-transform server-side. See
+#    ERD §1.4 / §1.6 and bridge/serve.py for why we don't use plain
+#    `python3 -m http.server` anymore.
 if ! lsof -iTCP:"$PAD_PORT" -sTCP:LISTEN >/dev/null 2>&1; then
   # Start in the background, detached, surviving this script's exit.
-  nohup python3 -m http.server "$PAD_PORT" --bind 127.0.0.1 --directory "$PAD_DIR" \
+  nohup env VOICEITT_BRIDGE_PORT="$PAD_PORT" VOICEITT_BRIDGE_DIR="$PAD_DIR" \
+    python3 "$PAD_DIR/serve.py" \
     >>"$LOG_FILE" 2>&1 </dev/null &
   disown 2>/dev/null || true
 

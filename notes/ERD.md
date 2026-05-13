@@ -141,12 +141,25 @@ any LLM work in §1.
 <details open>
 <summary><h3 style="display:inline">0.5.2 Send-script retargeting</h3></summary>
 
-- [ ] Update `send-to-iterm.sh` and `send-to-iterm-and-run.sh` to
-      Cmd+A/Cmd+C the **bottom** textarea (`pad-out`) instead of `pad`.
-- [ ] Same change in `send-to-vscode.sh` and any future `send-to-*.sh`
-      shipped by §0.3.
-- [ ] Smoke-test with Sticky Keys ON: dictate → bottom pane mirrors →
-      hotkey pastes the right text into iTerm and VS Code.
+**Design pivot.** Original plan was to hard-code each `send-to-*.sh` to
+target `pad-out`. Replaced with a page-side fix: `bridge/dictate.html`
+no longer steals focus back to `pad` when Raycast briefly takes OS
+focus, so the existing scripts (which already do `Cmd+A` / `Cmd+C` in
+the focused app) now copy from whichever pane the user has focused.
+Side benefit: lets the user deliberately send the raw `pad` text by
+clicking into it before the hotkey, which the original plan would have
+prevented.
+
+- [x] ~~Update `send-to-iterm.sh` and `send-to-iterm-and-run.sh` to
+      Cmd+A/Cmd+C the **bottom** textarea (`pad-out`) instead of `pad`.~~
+      *Superseded by `fix(bridge): send-to-* respects which pane has focus`
+      — no per-script edits needed.*
+- [x] ~~Same change in `send-to-vscode.sh` and any future `send-to-*.sh`
+      shipped by §0.3.~~ *Superseded; new `send-to-*.sh` scripts get the
+      focus-driven behaviour for free via the page fix.*
+- [ ] Smoke-test with Sticky Keys ON: focus the bottom pane → hotkey
+      pastes cleaned text; focus the top pane → hotkey pastes raw
+      dictated text. Repeat for iTerm and VS Code.
 
 </details>
 
@@ -223,26 +236,101 @@ scratchpad. The transform fires when Voiceitt finishes a phrase, not at
 hotkey time — so the existing `send-to-*.sh` bash is unchanged from
 §0.5; all of §1's net-new logic lives in the page + a small CLI.
 
-<details open>
-<summary><h3 style="display:inline">1.1 Prompt config</h3></summary>
+**MVP status (auto-trigger vertical slice).** The §1.3 auto-trigger +
+manual `⌘↵` trigger are wired end-to-end through a new `bridge/serve.py`
+that exposes `POST /transform` and shells out to the existing
+`scripts/voiceitt-transform` (v0 Gemini). What this does *not* yet
+include: the prompt picker (§1.2), the `POST /active-prompt` endpoint
+and `~/.config/voiceitt-bridge/active-prompt` sidecar (§1.4), the
+`.md`-file-driven prompt loading in `voiceitt-transform` (§1.5 — still
+hardcoded), and updating the `send-to-*.sh` scripts to copy from
+`pad-out` instead of `pad` (§0.5.2). Until §0.5.2 lands, the MVP is
+verifiable in-page (dictate → bottom pane fills with cleaned text) but
+the existing send hotkeys still pick up the raw text from `pad`.
 
-- [ ] Author `prompts/default.md` as the human-editable source of truth
-      for the default `fix-dictation` system prompt (Markdown so it
-      reviews cleanly without JSON escaping).
-- [ ] Ship `bridge/prompts.default.json` with the starter prompt set from
-      ROADMAP §1 (`off`, `fix-dictation`, `shell-command`, `amp-prompt`,
-      `bullet-list`, `polite-email`, `gemini-rewrite`).
-- [ ] Top-level `"version": 1` in `prompts.default.json` so future
-      schema migrations have an anchor.
-- [ ] Build/install step inlines `prompts/default.md` as the `system`
-      field of the `fix-dictation` entry (so the Markdown stays the
-      canonical text).
-- [ ] `install.sh` copies the seeded JSON to
-      `~/.config/voiceitt-bridge/prompts.json` on first run; never
-      overwrites on subsequent runs (user edits stick).
-- [ ] Decide v1 default: ship with `default: "off"` (surprise-free) vs
-      `default: "fix-dictation"`. Recommend `off`; record the call here
-      when made.
+**Default-off pivot (§1.0 below).** The MVP described in this status
+block auto-fires the transform on every utterance. That has been
+inverted: the auto-trigger is now gated on a master `AI` toggle in the
+header, default OFF. The mechanics in §1.3 still apply *when the toggle
+is on*; with it off, the page just mirrors `pad → pad-out` and never
+calls the LLM. `⌘↵` keeps its one-shot-override behaviour.
+
+<details open>
+<summary><h3 style="display:inline">1.0 AI master toggle (default-off opt-in)</h3></summary>
+
+The single switch that turns the entire §1 pipeline on. Inverts the
+§1.3 MVP's auto-by-default behaviour so fresh installs cost zero LLM
+calls until the user opts in.
+
+- [x] Add a checkbox + label `AI` to the scratchpad header in
+      `bridge/dictate.html`, between the status indicator and the
+      Clear button.
+- [x] Persist state to `localStorage` under
+      `voiceitt-bridge:ai-enabled`. Default OFF.
+- [x] Gate the §1.3 auto-trigger on the toggle: when OFF, mirror
+      `pad.value → padOut.value` and set status to `off`; when ON,
+      call `scheduleTransform()` as before.
+- [x] Toggling OFF mid-call aborts any in-flight transform so a stale
+      result doesn't land after the user opted out.
+- [x] Toggling ON does **not** retroactively fire on whatever's already
+      in `pad` — the next utterance triggers normally. Avoids surprise
+      LLM cost on toggle-flip.
+- [x] `⌘↵` in the input pane is **also gated** on the toggle: no-op
+      when AI is off. "Off means off" across both auto-trigger and
+      manual-trigger paths; firing the LLM with `pad-out` hidden would
+      be invisible work. To try the LLM on a single phrase, flip the
+      toggle on first.
+- [x] Initial status indicator reflects the persisted toggle state
+      (`off` on first paint when the toggle starts unchecked).
+- [x] **Hide `#pane-out` entirely when AI is off.** Body class
+      `ai-off` drives the CSS rule `body.ai-off #pane-out { display:
+      none; }`. The Dictated pane's `flex: 1` expands to fill the body
+      automatically. Toggling off while `pad-out` had focus bounces
+      focus back to `pad` so the next dictation / hotkey send lands on
+      a visible target. Reinforces the binary: AI on = two panes; AI
+      off = single-pane scratchpad.
+- [ ] Smoke-test: fresh `localStorage`, dictate three phrases, confirm
+      no `/transform` POSTs in DevTools Network panel and only the
+      Dictated pane is visible. Then check the box: `pad-out` appears,
+      dictate, confirm one POST per utterance and the cleaned text
+      lands in `pad-out`. Uncheck mid-flight: `pad-out` disappears and
+      the in-flight request is cancelled in the Network panel.
+
+</details>
+
+<details open>
+<summary><h3 style="display:inline">1.1 Prompt files (one Markdown file per prompt)</h3></summary>
+
+- [x] Author `prompts/default.md` as the canonical "fix dictation noise"
+      system prompt (the file body *is* the system message; no JSON,
+      no front matter, no escaping).
+- [ ] Ship a small starter set of additional `.md` files alongside it
+      so the dropdown isn't a list of one on first run
+      (e.g. `shell-command.md`, `bullet-list.md`, `polite-email.md`,
+      `amp-prompt.md`).
+- [x] `install.sh` symlinks the repo's `prompts/` dir →
+      `~/.config/voiceitt-bridge/prompts/` (idempotent, same convention
+      already used for `bridge/dictate.html` and the Raycast scripts).
+      User-added `.md` files in that directory survive re-installs;
+      user edits to `default.md` (if they un-symlinked it) are never
+      overwritten.
+      *Landed early as part of the §1.3 bug fix so `voiceitt-transform`
+      can read `default.md` from a stable path.*
+- [ ] **No `prompts.json`**, no top-level schema version, no `jq`-based
+      lookup. Prompt id = filename (e.g. `default.md`); display label =
+      filename minus `.md`, with `-`/`_` → spaces, title-cased
+      (`polite-email.md` → `Polite email`).
+- [ ] **No per-prompt `provider`/`model` in v1.** Project-wide defaults
+      come from `$VOICEITT_PROVIDER` (default `anthropic`) and
+      `$VOICEITT_MODEL` (default `claude-haiku-4-5`). Per-prompt
+      overrides via optional YAML front matter are a planned follow-up,
+      not v1.
+- [x] ~~Decide v1 first-load default: select `default.md` (most users
+      benefit) vs the synthesised `Off — paste as dictated` entry
+      (surprise-free). Recommend `Off`; record the call here when made.~~
+      *Subsumed by §1.0: the master toggle is the surprise-free default
+      (off). When the toggle is on, the picker can default to
+      `default.md` without revisiting this question.*
 
 </details>
 
@@ -251,11 +339,17 @@ hotkey time — so the existing `send-to-*.sh` bash is unchanged from
 
 - [ ] Add `<select id="prompt-picker">` to `bridge/dictate.html` header,
       between the title and the Clear button.
-- [ ] Populate options from `fetch('/prompts.json')` at page load.
-- [ ] First option always **`Off — paste as dictated`** (regardless of
-      file order).
-- [ ] Persist current selection to `localStorage` so it survives reloads.
-- [ ] On change, write the chosen prompt id to
+- [ ] Populate options at page load from a `GET /prompts/` directory
+      listing served by the local bridge server (one option per `.md`
+      file). Display label derived from filename per §1.1.
+- [-] ~~First option is always the synthesised **`Off — paste as
+      dictated`** (not a file on disk; the picker prepends it).~~
+      *Superseded by §1.0's master toggle. The picker only lists real
+      `.md` files; turning the LLM off entirely is what the toggle is
+      for.*
+- [ ] Persist current selection (filename, or the literal string `off`)
+      to `localStorage` so it survives reloads.
+- [ ] On change, write the chosen filename (or `off`) to
       `~/.config/voiceitt-bridge/active-prompt` via a small
       `POST /active-prompt` endpoint added to the local bridge server.
 - [ ] Add a `↻ Re-run` button next to the picker; enabled iff
@@ -268,73 +362,148 @@ hotkey time — so the existing `send-to-*.sh` bash is unchanged from
 <details open>
 <summary><h3 style="display:inline">1.3 Trigger logic in `bridge/dictate.html`</h3></summary>
 
-- [ ] **Auto-trigger:** latch a `voiceittWriting` flag on any
+- [x] **Auto-trigger:** latch a `voiceittWriting` flag on any
       synthetic (`isTrusted: false`) `paste` event on the input field
       (capture phase); consume on the next `input` event; debounce
       ~700 ms before firing the transform. (Captures the
       `execCommand('insertHTML')` Voiceitt signature documented in
       ROADMAP §1 "Trigger mechanics".)
-- [ ] **Manual trigger:** Re-run button + `⌘↵` call the same function
-      as the auto-trigger.
-- [ ] After every successful transform, set
-      `lastInputSentToLLM = inputField.value` so the Re-run button
-      goes dark.
-- [ ] Editing the **output** field directly is allowed (output becomes
+- [~] **Manual trigger:** `⌘↵` shipped (force-fires the transform
+      bypassing the `lastInputSentToLLM` gate). The visible "↻ Re-run"
+      button is part of §1.2 (picker UI) and lands with that.
+- [x] After every successful transform, set
+      `lastInputSentToLLM = inputField.value` so a future Re-run button
+      gates correctly.
+- [x] Editing the **output** field directly is allowed (output becomes
       editable here, removing the `readonly` from §0.5.1) and does **not**
       affect `lastInputSentToLLM`.
-- [ ] When the active prompt is `off`, the transform function is
+- [-] When the active prompt is `off`, the transform function is
       identity (`output = input`); no special-casing needed elsewhere.
+      *Deferred to §1.2 (picker). MVP has no picker yet, so the only
+      "off" path today is the fail-open one when the server-side call
+      errors — which writes the raw input into the output pane and
+      flags `fail-open: raw` in the header status indicator.*
+- [x] **Bug fix:** the auto-trigger was sending the dictated text raw,
+      paired with `voiceitt-transform`'s placeholder one-line "fix
+      dictation noise" SYSTEM prompt. Result: utterances like
+      "make a directory called src" came back as the LLM trying to
+      *do* the command (or echoing a fenced shell snippet) instead of
+      cleaning the wording. Fixed in `voiceitt-transform` by (a)
+      loading the SYSTEM prompt from `prompts/default.md` (which
+      already explains the `<TRANSCRIPT>` framing) and (b) wrapping
+      stdin in `<TRANSCRIPT>…</TRANSCRIPT>` before sending it as the
+      user message. `install.sh` now also symlinks `prompts/` into
+      `~/.config/voiceitt-bridge/prompts/` (ticks the corresponding
+      §1.1 item early). The proper picker / active-prompt /
+      `.md`-by-id loading still belong to §1.2 / §1.4 / §1.5.
 
 </details>
 
 <details open>
 <summary><h3 style="display:inline">1.4 Local server endpoint for picker → CLI handoff</h3></summary>
 
-- [ ] Replace `python3 -m http.server` (or extend it) with a tiny
-      handler that serves the `bridge/` dir **and** accepts
-      `POST /active-prompt` with body `{ "id": "<prompt-id>" }`,
-      writing it to `~/.config/voiceitt-bridge/active-prompt`.
-- [ ] Document the chosen impl (Python `http.server` subclass, Node
-      one-liner, etc.) in `bridge/`.
+- [x] Replace `python3 -m http.server` with `bridge/serve.py`
+      (a `SimpleHTTPRequestHandler` subclass on `ThreadingHTTPServer`,
+      ~100 lines of stdlib Python). Symlinked into
+      `~/.config/voiceitt-bridge/` by `install.sh`; launched by
+      `scripts/open-voiceitt.sh` instead of `python3 -m http.server`.
+- [x] `POST /transform` with body `{ "text": "..." }` shells out to
+      `voiceitt-transform`, returns the cleaned text as
+      `text/plain; charset=utf-8`. Hard outer timeout from
+      `$VOICEITT_TRANSFORM_HARD_TIMEOUT` (default 10 s); any non-2xx
+      makes the page fail-open with raw input. (Shipped ahead of the
+      picker because §1.3's auto-trigger needs *some* transform
+      endpoint to call.)
+- [x] **Error surfacing contract:** on a non-zero exit from
+      `voiceitt-transform`, the bridge writes the subprocess's full
+      stderr — which by contract includes the upstream provider's HTTP
+      status code and raw response body (or the `curl` exit code +
+      stderr on transport failure) — verbatim to `server.log`. The
+      HTTP response back to the page stays a single-line 502 so the
+      §1.3 fail-open behaviour is unchanged; the diagnosable detail
+      lives in the log, not the wire. Stock `BaseHTTPRequestHandler`
+      access/error log lines are suppressed (`log_request` /
+      `log_error` overridden to no-ops) so each round-trip produces
+      exactly one log entry — the rich `transform: in=… out=…` line
+      on success or the multi-line failure block on error.
+  - [ ] `GET /prompts/` returns a JSON array of `.md` filenames in
+        `~/.config/voiceitt-bridge/prompts/` (needed by §1.2's picker).
+  - [ ] `POST /active-prompt` with body `{ "id": "<filename>" }` (or
+        `{ "id": "off" }`) writes that string to
+        `~/.config/voiceitt-bridge/active-prompt`.
+- [x] Document the chosen impl (Python `http.server` subclass) in the
+      `bridge/serve.py` module docstring.
+- [ ] *(Foreshadow §1.5.1):* let `POST /transform` grow to accept a
+      rolling session-context buffer alongside the current text;
+      don't change the wire shape in a way that requires a rewrite.
 
 </details>
 
 <details open>
 <summary><h3 style="display:inline">1.5 Transformer CLI</h3></summary>
 
-- [ ] Create `scripts/voiceitt-transform` (bash + curl + jq).
-- [ ] Reads stdin; reads active prompt id from
+- [x] Create `scripts/voiceitt-transform` (bash + curl + jq).
+      *Shipped as a v0 vertical slice: hardcoded "lightly clean
+      dictated text" system prompt, hardcoded provider (Google AI
+      Studio / Gemini 2.5 Flash). All the wiring below replaces the
+      hardcoded bits with the real prompt-file pipeline.*
+- [ ] Reads stdin; reads active prompt filename from
       `~/.config/voiceitt-bridge/active-prompt`, falling back to
-      `prompts.json`'s `default`.
-- [ ] Looks up prompt definition in `prompts.json` (`provider`, `model`,
-      `system`).
-- [ ] If `provider` is `off` (or empty) → echo stdin unchanged, exit 0.
+      `default.md` if the file is missing/empty.
+- [ ] If the active value is the literal `off` (or empty) → echo stdin
+      unchanged, exit 0.
+- [ ] Loads the system prompt by reading
+      `~/.config/voiceitt-bridge/prompts/<filename>` verbatim (whole
+      file body is the system message — no JSON, no front-matter
+      parsing in v1). *Today the prompt is hardcoded inside the CLI;
+      this item swaps that for an `.md` read.*
+- [ ] Provider/model come from project-wide env vars
+      `$VOICEITT_PROVIDER` (default `anthropic`) and `$VOICEITT_MODEL`
+      (default `claude-haiku-4-5`). **No per-prompt overrides in v1.**
+      *Today provider is hardcoded to Google; only `$VOICEITT_TRANSFORM_MODEL`
+      is honoured.*
 - [ ] Provider branches: `anthropic`, `openai`, `google` (AI Studio
-      Gemini API), `ollama` (`http://localhost:11434`).
-- [ ] Hard timeout via `curl --max-time "$VOICEITT_TRANSFORM_TIMEOUT"`
-      (default `2.5`); on timeout/non-zero exit, caller falls back to
-      raw text (fail-open).
+      Gemini API), `ollama` (`http://localhost:11434`). *Only `google`
+      branch exists today.*
+- [x] Hard timeout via `curl --max-time "$VOICEITT_TRANSFORM_TIMEOUT"`.
+      *Default is currently `6` s for standalone testing; needs to drop
+      back to `~2.5` s once the send-script wrappers gain an explicit
+      fail-open-to-raw-clipboard path. The page-side caller in §1.3
+      already fail-opens, so server-side this can come down sooner.*
 - [ ] Honour `$VOICEITT_BRIDGE_CONFIG` to override config dir (useful
-      for testing).
+      for testing). *Not needed yet — the v0 CLI has no config-dir
+      reads. Add when prompt-file loading lands.*
 - [ ] Document required env vars: `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`,
-      `GOOGLE_API_KEY`, `VOICEITT_BRIDGE_CONFIG`,
-      `VOICEITT_TRANSFORM_TIMEOUT`.
-- [ ] Document the `~/.config/voiceitt-bridge/env` fallback file
-      (sourced by `send-to-*.sh` for users whose Raycast doesn't inherit
-      shell env).
+      `GOOGLE_API_KEY`, `VOICEITT_BRIDGE_CONFIG`, `VOICEITT_PROVIDER`,
+      `VOICEITT_MODEL`, `VOICEITT_TRANSFORM_TIMEOUT`.
+- [x] `~/.config/voiceitt-bridge/env` fallback file: sourced by
+      `scripts/open-voiceitt.sh` before launching `serve.py`, so the
+      server (and the `voiceitt-transform` subprocess it spawns)
+      inherits `GOOGLE_API_KEY` etc. even when Raycast didn't inherit
+      them from the user's interactive shell. Plain `KEY=value` lines;
+      gitignored. README walkthrough is still owed (§1.7).
 
 </details>
 
 <details open>
 <summary><h3 style="display:inline">1.6 Page-side integration (the LLM POST)</h3></summary>
 
-- [ ] On auto/manual trigger, the page POSTs the input text +
-      active-prompt id to a local endpoint that shells out to
-      `voiceitt-transform`, **or** the page calls the provider API
-      directly and writes the result into the output field. Pick one;
-      record the choice here.
-- [ ] Whichever path wins, send-scripts stay unchanged from §0.5
-      (already targeting the bottom pane).
+- [x] **Decision recorded:** the page POSTs `{ "text": "..." }` to
+      `POST /transform` on the local bridge server, which shells out to
+      `voiceitt-transform`. Picked over "page calls provider directly"
+      so the API key stays in the shell env (`open-voiceitt.sh`
+      inherits it from Raycast) and never lands in browser
+      `localStorage`. The active-prompt id is **not** sent in the body
+      yet — added when §1.2's picker lands and the CLI grows
+      `.md`-file prompt loading (§1.5).
+- [x] AbortController on every request so a fresh dictation cancels any
+      in-flight transform; non-2xx responses fall open by writing the
+      raw input into `pad-out` and flagging `fail-open: raw` in the
+      header status indicator.
+- [x] Send-scripts stay unchanged. **Caveat:** §0.5.2 (point them at
+      `pad-out` instead of `pad`) is still open — until that lands the
+      MVP is verifiable in-page only; the actual hotkey paste still
+      grabs the raw `pad` text.
 
 </details>
 
@@ -343,10 +512,16 @@ hotkey time — so the existing `send-to-*.sh` bash is unchanged from
 
 - [ ] New top-level section: **Optional: AI transformation before paste**.
 - [ ] Picker screenshot.
-- [ ] Env-var setup walkthrough (per provider).
-- [ ] `prompts.json` example + how to add a new prompt.
-- [ ] Note that editing `prompts/default.md` + reseeding is how the
-      `fix-dictation` prompt is changed.
+- [ ] Env-var setup walkthrough (per provider), including
+      `VOICEITT_PROVIDER` / `VOICEITT_MODEL` for choosing the
+      project-wide default model.
+- [ ] "Adding a new prompt" walkthrough: drop a new `.md` file into
+      `prompts/`, save, reload the scratchpad tab. No JSON, no
+      restart.
+- [ ] Note that editing `prompts/default.md` (in place) is how the
+      default "fix dictation noise" prompt is changed — the symlink
+      means the file the user edits *is* the file the transformer
+      reads.
 
 </details>
 
@@ -359,9 +534,13 @@ hotkey time — so the existing `send-to-*.sh` bash is unchanged from
 - [-] Per-destination prompt defaults (post-v1; layer on top of picker).
 - [-] History / undo of dictated → transformed pairs.
 - [-] "Hey AI, …" ad-hoc command syntax (deferred; picker covers ~90%).
-- [-] SQLite-backed prompt store (deferred; JSON is the v1 contract,
-      migration is contained because the rest of the system only sees
-      "give me the active prompt's `system` + `provider`").
+- [-] Per-prompt `provider` / `model` overrides via YAML front matter
+      (deferred; v1 uses project-wide `$VOICEITT_PROVIDER` /
+      `$VOICEITT_MODEL` for everything).
+- [-] SQLite-backed prompt store (deferred; "directory of `.md` files"
+      is the v1 contract, and the migration is contained because the
+      rest of the system only ever sees "give me the active prompt's
+      system text").
 
 </details>
 

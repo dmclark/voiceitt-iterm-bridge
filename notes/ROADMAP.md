@@ -122,14 +122,16 @@ guesses instead of what actually worked.
 <summary><h2 style="display:inline">0.5. Two-pane scratchpad + a little visual polish (prep for §1)</h2></summary>
 
 
-**Status: largely complete.** Shipped in [PR #2](https://github.com/dmclark/voiceitt-iterm-bridge/pull/2):
+**Status: complete.** Shipped in [PR #2](https://github.com/dmclark/voiceitt-iterm-bridge/pull/2):
 two-pane layout, mirror-on-input wiring, Atkinson Hyperlegible
 typography pass, warmer background + rounded panes, caret-visibility
 combo (high-contrast colour + focus font-size bump + focused-pane tint
-+ custom faux-caret overlay). **Still pending:** ERD §0.5.2 — updating
-the `send-to-*.sh` scripts to Cmd+A/Cmd+C the bottom (`pad-out`)
-textarea instead of the top one. That's the last remaining block before
-§1 can build on top.
++ custom faux-caret overlay). The pane-targeting piece originally
+scoped as ERD §0.5.2 was solved page-side instead of per-script:
+`bridge/dictate.html` no longer steals focus when Raycast briefly takes
+OS focus, so the existing `send-to-*.sh` scripts now copy from whichever
+pane the user has focused. Side benefit: focusing the top pane sends
+the raw dictated text, bypassing the LLM transform on demand.
 
 **Priority: do this before §1.** The scratchpad is currently a single
 `<textarea>` that gets dictated into and then Cmd+A/Cmd+C'd straight onto
@@ -295,6 +297,29 @@ in?" and "where in that pane is my caret?" without any JS. Save (4) and
 
 <details open>
 <summary><h2 style="display:inline">1. AI post-processing</h2></summary>
+
+
+**Design pivot — default-off, opt-in via master toggle.** The original §1
+plan (and the §1.3 MVP that shipped behind it) auto-fires the LLM
+transform on every Voiceitt utterance, with `Off — paste as dictated`
+buried as one of the prompt-picker entries. That's been inverted: a
+**master `AI` toggle in the scratchpad header** (default OFF, persisted
+to `localStorage`) is the single binary that gates the entire pipeline.
+With the toggle off:
+
+- the page never calls the LLM (auto-trigger AND `⌘↵` are both no-ops);
+- the **`pad-out` pane is hidden entirely** — the scratchpad collapses
+  to a single-pane "dictate and send" surface;
+- the existing focus-driven `send-to-*` flow keeps working unchanged
+  (only `pad` is visible, so it's always the focused pane).
+
+With the toggle on, both panes are visible and the §1.3 mechanics
+described below take over. The `Off — paste as dictated` picker entry
+described in §1.2 / §1.3 is **superseded** by the master toggle —
+keeping both would be redundant.
+
+Everything in the prose below describes the mechanics *when the toggle
+is on*. When it's off, none of it runs.
 
 
 <details open>

@@ -6,3 +6,6 @@ notes-chrome-extension.md
 # macOS noise
 .DS_Store
 .env
+# Python bytecode cache from running bridge/serve.py locally
+__pycache__/
+*.pyc

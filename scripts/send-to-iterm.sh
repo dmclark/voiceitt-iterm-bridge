@@ -37,15 +37,23 @@ if [ "$CURRENT" = "$SENTINEL" ] || [ -z "$CURRENT" ]; then
   exit 1
 fi
 
-# 6) Inject clipboard text directly into iTerm's current session.
+# 6) Activate iTerm so the paste lands in the right app.
 osascript <<'EOF'
-set clipText to (the clipboard as text)
 tell application "iTerm"
   activate
   tell current window
-    tell current session
-      write text clipText newline no
-    end tell
+    tell current session to select
   end tell
 end tell
 EOF
+
+# 7) Give iTerm a beat to take focus, then release modifiers again
+#    (activation can race with Sticky Keys re-latching Cmd).
+sleep 0.15
+"$CLICLICK" ku:cmd,alt,ctrl,shift,fn >/dev/null 2>&1 || true
+sleep 0.05
+
+# 8) Sticky-Keys-proof Cmd+V. Bracketed paste (default in modern iTerm +
+#    shells/REPLs incl. Amp CLI) keeps embedded newlines as literal text
+#    instead of executing each line.
+"$CLICLICK" kd:cmd w:60 t:v w:60 ku:cmd

@@ -90,8 +90,8 @@ Two strategies, two starting points:
 
 | Strategy           | When to use                                            | Start from                  |
 | ------------------ | ------------------------------------------------------ | --------------------------- |
-| **AppleScript**    | App has a useful scripting dictionary for "insert text into the active session" (iTerm, Terminal). | `scripts/send-to-iterm.sh`  |
-| **cliclick paste** | Everything else (VS Code, Slack, Notes, browsers, most editors). | `scripts/send-to-vscode.sh` |
+| **cliclick paste** | Default. Works in any app that accepts a normal Cmd+V into its focused control (VS Code, iTerm, Slack, Notes, browsers, most editors). Preserves multi-line input via bracketed paste. | `scripts/send-to-vscode.sh` or `scripts/send-to-iterm.sh` |
+| **AppleScript**    | Only when the target app exposes a scripting dictionary that does something Cmd+V can't (e.g. addressing a specific tab/session out-of-focus). Note: iTerm's `write text` mangles embedded newlines, so we no longer use it. | (no current example)        |
 
 When in doubt, copy `send-to-vscode.sh` — the cliclick-paste strategy works
 in any app that accepts a normal Cmd+V into its focused control.
@@ -159,8 +159,7 @@ your edited script still has it before step 6.
 ```
 scripts/
   open-voiceitt.sh         # Starts python3 http.server on :7531, opens Chrome window
-  send-to-iterm.sh         # Cmd+A/Cmd+C → inject clipboard into current iTerm tab (no Return)
-  send-to-iterm-and-run.sh # Same, plus Return (submits the line)
+  send-to-iterm.sh         # Cmd+A/Cmd+C → activate iTerm → cliclick Cmd+V (bracketed paste, no Return)
   send-to-vscode.sh        # Cmd+A/Cmd+C → activate VS Code → cliclick Cmd+V into active editor
   back-to-voiceitt.sh      # Find Chrome window titled "Voiceitt Scratchpad", raise it
 bridge/
