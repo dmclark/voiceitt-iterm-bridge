@@ -1086,6 +1086,95 @@ file). Corrections memory is persistent state, lives in
 ---
 
 <details open>
+<summary><h2 style="display:inline">1.6. Local-file loader for the scratchpad</h2></summary>
+
+
+**Status: shipped.** Landed in [`feat/local-file-loader`](https://github.com/dmclark/voiceitt-iterm-bridge/tree/feat/local-file-loader). See ERD §4 for the ticked checklist.
+
+Goal: open an arbitrary local text file in the scratchpad's input pane so the
+user can edit it by voice (Voiceitt → §1 LLM → §0.5 panes) and then push the
+result into a target app via the existing `send-to-*.sh` flow. Closes the
+"dictate-to-edit-existing-text" loop without touching any of the send
+scripts; the editing happens in the same pane the send scripts already read
+from.
+
+<details open>
+<summary><h3 style="display:inline">Two load paths, on purpose</h3></summary>
+
+
+| Path | Trigger | Path-aware? | Survives page reload? |
+| ---- | ------- | ----------- | --------------------- |
+| Raycast `Load File into Scratchpad` | osascript `choose file` | yes — POST `/load` with absolute path | no (by design — see below) |
+| In-page **Load…** button | header button → hidden `<input type="file">` → `FileReader` | no — the browser never tells JS the absolute path | no — never reaches the server |
+
+The Raycast path was the original design ("you're at your editor, you want
+to dictate edits into a file"); the in-page button was added because the
+user expected one next to **Clear** and it costs ~25 lines of JS. Both end
+up populating the same `pad`/`pad-out` pair and reveal the same
+loaded-file strip under the header, so they're indistinguishable to use.
+
+A page reload always starts with a clean slate. The Raycast loader assumes
+the scratchpad is already open — if you load a file before opening the
+tab, you re-run the load. We deliberately did not add a "fetch + clear
+server state on first paint" path; the simpler "SSE-only delivery, no
+auto-restore" semantics matched the user's mental model.
+</details>
+
+
+<details open>
+<summary><h3 style="display:inline">Constraints (hard-capped server-side and page-side)</h3></summary>
+
+
+- **50 KB max.** Scratchpad text editing past that gets unwieldy and the
+  LLM-transform path (§1) breaks down on long inputs anyway.
+- **UTF-8 only.** Server rejects with 415 on `UnicodeDecodeError`; page-side
+  detects FileReader's silent U+FFFD replacement and refuses.
+- **Path under `$HOME` only.** Stops a stray `POST /load` from slurping
+  `/etc/...`. The in-page path can't enforce this (no absolute path) but the
+  OS open-panel restricts what the user can pick anyway.
+- **Single in-memory slot, no history.** Multiple-file loading / recent-files
+  dropdown is parked (see [PARKING-LOT.md](./PARKING-LOT.md) `2026-05-13`).
+</details>
+
+
+<details open>
+<summary><h3 style="display:inline">Why Server-Sent Events for the live-swap</h3></summary>
+
+
+The Raycast loader runs in a different process from the page; the page needs
+to know "a new file just landed" without polling. Two reasonable options:
+
+- **Polling `/file` every N seconds** — simplest, works, wastes a request
+  every N seconds forever.
+- **SSE (`EventSource`) on `/events`** — long-lived HTTP, server pushes a
+  `reload` event after each `POST /load`. Built into the browser, auto-
+  reconnects with backoff, and the scratchpad already runs against a tiny
+  Python server we control.
+
+WebSockets would be overkill for one event type in one direction. SSE is
+~30 lines on the server (one `Queue` per subscriber, broadcast on `/load`,
+heartbeat every 15 s) and one `EventSource` listener on the page.
+</details>
+
+
+<details open>
+<summary><h3 style="display:inline">Out of scope (explicit)</h3></summary>
+
+
+- **Save-back-to-file.** One-way load only; if the user wants to write the
+  edited text to disk, that's a separate `send-to-file.sh` Raycast command
+  (or a `POST /save` endpoint), not the loader's job.
+- **Multiple files / recent-files dropdown.** Parked.
+- **Binary or non-UTF-8 files.** Refused at both layers.
+- **Files outside `$HOME`.** Refused server-side.
+</details>
+
+</details>
+
+
+---
+
+<details open>
 <summary><h2 style="display:inline">2. Pluggable target window — paste anywhere, not just iTerm</h2></summary>
 
 
