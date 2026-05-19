@@ -19,6 +19,7 @@ Format: `- YYYY-MM-DD  one-line idea`. Group by theme.
 - 2026-05-08  surface transform call status in a small box in the top-right of the output pane; maybe link to open server.log in a new window
 - 2026-05-13  load a local file into the scratchpad to edit with Voiceitt, then push to target app
 - 2026-05-13  scratchpad loader: support loading multiple files / recent-files dropdown
+- 2026-05-15  voiceitt UI cannot float over arbitrary macOS apps — Chrome MV3 sandbox + Voiceitt's document.hasFocus() insertion gate kill DPiP / window-pinning / click-through paths; revisit only if forking the unpacked extension becomes acceptable
 
 ## Tooling / workflow
 

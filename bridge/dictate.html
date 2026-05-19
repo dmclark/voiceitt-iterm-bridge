@@ -177,6 +177,15 @@
      * LLM on this one phrase without flipping the master switch".
      */
     const AI_TOGGLE_KEY = 'voiceitt-bridge:ai-enabled';
+    // Optional URL override: ?ai=0 or ?ai=1 lets the dictate.sh /
+    // dictate-ai.sh Raycast wrappers force a specific mode at open time,
+    // regardless of what localStorage previously remembered. The override
+    // is also persisted so the next bare reload (no query) honors the
+    // new choice. Anything else leaves the persisted toggle alone.
+    const aiParam = new URLSearchParams(location.search).get('ai');
+    if (aiParam === '0' || aiParam === '1') {
+      localStorage.setItem(AI_TOGGLE_KEY, aiParam);
+    }
     let aiEnabled = localStorage.getItem(AI_TOGGLE_KEY) === '1';
     aiToggle.checked = aiEnabled;
 
