@@ -21,6 +21,10 @@ This approach is to provide the same functionality without the API. We are servi
 Three larger pieces of work that the current toolkit doesn't yet cover. All
 are deliberately out of scope for the first version — this doc is the plan for
 "phase two" once the basic iTerm bridge has shaken out in daily use.
+
+Related spike: [Raycast v2 + Voiceitt feasibility](./raycast-v2-voiceitt-feasibility.md)
+selects the Raycast extension wrapper path so the normal workflow keeps using
+the Voiceitt Chrome extension and avoids Voiceitt API usage fees.
 </details>
 
 
